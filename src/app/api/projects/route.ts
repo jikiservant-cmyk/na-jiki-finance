@@ -1,12 +1,9 @@
-import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { getPublishedProjects } from '@/lib/data'
 
 export async function GET() {
   try {
-    const projects = await db.portfolioProject.findMany({
-      where: { published: true },
-      orderBy: { sortOrder: 'asc' },
-    })
+    const projects = await getPublishedProjects()
     return NextResponse.json(projects)
   } catch (error) {
     console.error('Projects API error:', error)

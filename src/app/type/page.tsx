@@ -2,6 +2,7 @@
 
 import { motion, useInView } from 'framer-motion'
 import { useRef, useState } from 'react'
+import { PageLayout } from '@/components/portfolio/page-layout'
 
 const specimens = [
   {
@@ -47,15 +48,10 @@ function SpecimenCard({ specimen, index }: { specimen: typeof specimens[0]; inde
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return
-    setPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    })
+    setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })
   }
 
-  const handleMouseUp = () => {
-    setIsDragging(false)
-  }
+  const handleMouseUp = () => setIsDragging(false)
 
   return (
     <motion.div
@@ -63,98 +59,79 @@ function SpecimenCard({ specimen, index }: { specimen: typeof specimens[0]; inde
       initial={{ opacity: 0, y: 40, rotate: index % 2 === 0 ? -1 : 1 }}
       animate={isInView ? { opacity: 1, y: 0, rotate: index % 2 === 0 ? -1 : 1 } : {}}
       transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: index * 0.15 }}
-      className="relative"
-      style={{
-        transform: `translate(${position.x}px, ${position.y}px)`,
-        cursor: isDragging ? 'grabbing' : 'grab',
-      }}
+      style={{ transform: `translate(${position.x}px, ${position.y}px)`, cursor: isDragging ? 'grabbing' : 'grab' }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
       <div className="bg-card border border-foreground/10 p-6 md:p-8 select-none">
-        {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
             <h3 className="text-2xl md:text-3xl font-black tracking-tight">{specimen.name}</h3>
             <div className="flex gap-2 mt-2">
               {specimen.weights.map(w => (
-                <span key={w} className="text-[10px] font-mono px-2 py-0.5 bg-foreground/5 text-foreground/50 rounded">
-                  {w}
-                </span>
+                <span key={w} className="text-[10px] font-mono px-2 py-0.5 bg-foreground/5 text-foreground/50 rounded">{w}</span>
               ))}
             </div>
           </div>
           <button
             className="text-[10px] font-mono tracking-[0.2em] uppercase px-3 py-1.5 border border-foreground/20 hover:bg-foreground hover:text-background transition-colors"
-            onClick={(e) => {
-              e.stopPropagation()
-              // In production, this would download a PDF
-              alert(`Downloading ${specimen.name} specimen PDF...`)
-            }}
+            onClick={(e) => { e.stopPropagation(); alert(`Downloading ${specimen.name} specimen PDF...`) }}
           >
             Download PDF
           </button>
         </div>
-
-        {/* Type sample - large */}
         <div className="mb-6 p-4 bg-foreground/[0.03] border border-foreground/5">
-          <p className="text-2xl md:text-3xl leading-tight break-all" style={{ color: specimen.color }}>
-            {specimen.sample}
-          </p>
+          <p className="text-2xl md:text-3xl leading-tight break-all" style={{ color: specimen.color }}>{specimen.sample}</p>
         </div>
-
-        {/* Numbers */}
         <div className="mb-4 p-3 bg-foreground/[0.03] border border-foreground/5">
-          <p className="text-xl md:text-2xl font-mono tracking-wider" style={{ color: specimen.color }}>
-            {specimen.numbers}
-          </p>
+          <p className="text-xl md:text-2xl font-mono tracking-wider" style={{ color: specimen.color }}>{specimen.numbers}</p>
         </div>
-
-        {/* Special glyphs */}
         <div className="mb-4 p-3 bg-foreground/[0.03] border border-foreground/5">
-          <p className="text-lg md:text-xl font-mono" style={{ color: specimen.color + '99' }}>
-            {specimen.glyphs}
-          </p>
+          <p className="text-lg md:text-xl font-mono" style={{ color: specimen.color + '99' }}>{specimen.glyphs}</p>
         </div>
-
-        {/* Description */}
         <p className="text-sm text-foreground/40 leading-relaxed">{specimen.description}</p>
       </div>
     </motion.div>
   )
 }
 
-export function TypeSpecimensSection() {
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true, margin: '-100px' })
-
+export default function TypePage() {
   return (
-    <section id="type-specimens" className="px-6 md:px-16 lg:px-24 py-24">
-      {/* Section header */}
-      <motion.div
-        ref={ref}
-        initial={{ opacity: 0, y: 20 }}
-        animate={isInView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.6 }}
-        className="mb-16"
-      >
-        <span className="text-xs font-mono tracking-[0.3em] text-foreground/30 uppercase">Type Specimens</span>
-        <h2 className="text-5xl md:text-7xl font-black tracking-[-0.03em] mt-4">
-          Type<br />Systems
-        </h2>
-        <p className="text-lg text-foreground/50 mt-4 max-w-md">
-          Custom typefaces designed for East African financial interfaces. Drag specimens to rearrange. Download PDFs for full character sets.
-        </p>
-      </motion.div>
+    <PageLayout>
+      <div className="pt-14">
+        <div className="px-6 md:px-16 lg:px-24 pt-24 pb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="text-xs font-mono tracking-[0.3em] text-foreground/30 uppercase">Type Specimens</span>
+            <h1 className="text-6xl md:text-8xl font-black tracking-[-0.04em] mt-4">
+              Type
+            </h1>
+            <p className="text-lg text-foreground/50 mt-4 max-w-md">
+              Custom typefaces designed for East African financial interfaces. Drag specimens to rearrange. Download PDFs for full character sets.
+            </p>
+          </motion.div>
+        </div>
 
-      {/* Specimen cards - staggered layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {specimens.map((specimen, index) => (
-          <SpecimenCard key={specimen.name} specimen={specimen} index={index} />
-        ))}
+        <div className="px-6 md:px-16 lg:px-24 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {specimens.map((specimen, index) => (
+              <SpecimenCard key={specimen.name} specimen={specimen} index={index} />
+            ))}
+          </div>
+        </div>
       </div>
-    </section>
+
+      <footer className="px-6 md:px-16 lg:px-24 py-8 border-t border-foreground/5">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <span className="text-sm font-black tracking-tight">NKOLA<span className="text-accent">.</span></span>
+          <span className="text-[10px] font-mono text-foreground/20">© {new Date().getFullYear()}</span>
+        </div>
+      </footer>
+    </PageLayout>
   )
 }

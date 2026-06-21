@@ -1,75 +1,54 @@
-import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { getPaymentsWithApps, updatePaymentStatus, createWebhookLog, updateWebhookLog, createPaymentTransaction } from '@/lib/data'
 
-// Webhook endpoint that receives payment notifications from providers like LivePay
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const signature = request.headers.get('x-webhook-signature') || ''
     
-    // Log the webhook
-    const webhookLog = await db.webhookLog.create({
-      data: {
-        provider: body.provider || 'LIVEPAY',
-        eventType: body.eventType || 'PAYMENT_COMPLETED',
-        payload: JSON.stringify(body),
-        signature,
-        verified: true, // In production, verify signature
-        processed: false,
-      },
+    const webhookLog = await createWebhookLog({
+      provider: body.provider || 'LIVEPAY',
+      eventType: body.eventType || 'PAYMENT_COMPLETED',
+      payload: JSON.stringify(body),
+      signature,
+      verified: true,
+      processed: false,
     })
 
-    // Find the payment by reference
     const reference = body.reference || body.merchant_reference
     if (!reference) {
       return NextResponse.json({ error: 'Missing reference' }, { status: 400 })
     }
 
-    const payment = await db.payment.findUnique({
-      where: { reference },
-      include: { application: true },
-    })
+    const payments = await getPaymentsWithApps()
+    const payment = payments.find(p => p.reference === reference)
 
     if (!payment) {
-      await db.webhookLog.update({
-        where: { id: webhookLog.id },
-        data: { error: 'Payment not found', processed: true },
-      })
+      await updateWebhookLog(webhookLog.id, { error: 'Payment not found', processed: true })
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
     }
 
-    // Update payment status
     const newStatus = body.status === 'SUCCESS' ? 'SUCCESS' : 
                       body.status === 'FAILED' ? 'FAILED' : 'PENDING'
     
-    await db.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: newStatus,
-        providerReference: body.provider_reference || payment.providerReference,
-        providerResponse: JSON.stringify(body),
-        completedAt: newStatus === 'SUCCESS' ? new Date() : null,
-      },
+    await updatePaymentStatus(
+      reference,
+      newStatus,
+      body.provider_reference || undefined,
+      JSON.stringify(body)
+    )
+
+    await createPaymentTransaction({
+      paymentId: payment.id,
+      type: 'WEBHOOK_UPDATE',
+      status: newStatus,
+      amount: body.amount || payment.amount,
+      metadata: JSON.stringify(body),
     })
 
-    // Create transaction record
-    await db.paymentTransaction.create({
-      data: {
-        paymentId: payment.id,
-        type: 'WEBHOOK_UPDATE',
-        status: newStatus,
-        amount: body.amount || payment.amount,
-        metadata: JSON.stringify(body),
-      },
-    })
+    await updateWebhookLog(webhookLog.id, { paymentId: payment.id, processed: true })
 
-    // Mark webhook as processed
-    await db.webhookLog.update({
-      where: { id: webhookLog.id },
-      data: { paymentId: payment.id, processed: true },
-    })
-
-    // Notify the relevant application
+    // Notify the relevant application via internal API
     if (newStatus === 'SUCCESS' && payment.application.webhookUrl) {
       try {
         await fetch('/api/notify?XTransformPort=3000', {

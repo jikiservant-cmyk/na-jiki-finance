@@ -1,21 +1,12 @@
-import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { getPaymentsWithApps, getSuccessfulPayments } from '@/lib/data'
 
 export async function GET() {
   try {
-    const payments = await db.payment.findMany({
-      include: { application: true },
-      orderBy: { createdAt: 'desc' },
-    })
+    const payments = await getPaymentsWithApps()
+    const revenueByApp = await getSuccessfulPayments()
 
-    const totalRevenue = payments
-      .filter(p => p.status === 'SUCCESS')
-      .reduce((sum, p) => sum + p.amount, 0)
-
-    const revenueByApp = await db.payment.findMany({
-      where: { status: 'SUCCESS' },
-      include: { application: true },
-    })
+    const totalRevenue = revenueByApp.reduce((sum, p) => sum + p.amount, 0)
 
     const appRevenue: Record<string, { name: string; displayName: string; revenue: number; count: number }> = {}
     for (const p of revenueByApp) {
@@ -47,6 +38,7 @@ export async function GET() {
       providerRevenue[key].count += 1
     }
 
+    // Daily revenue for the last 14 days
     const dailyRevenue: { date: string; revenue: number; count: number }[] = []
     for (let i = 13; i >= 0; i--) {
       const date = new Date()

@@ -1,82 +1,50 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const navItems = [
-  { id: 'projects', label: 'Work' },
-  { id: 'type-specimens', label: 'Type' },
-  { id: 'lectures', label: 'Talks' },
-  { id: 'dashboard', label: 'Payments' },
-  { id: 'contact', label: 'Contact' },
+  { href: '/work', label: 'Work' },
+  { href: '/type', label: 'Type' },
+  { href: '/talks', label: 'Talks' },
+  { href: '/payments', label: 'Payments' },
+  { href: '/contact', label: 'Contact' },
 ]
 
 export function Navigation() {
-  const [scrolled, setScrolled] = useState(false)
-  const [activeSection, setActiveSection] = useState('')
+  const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 100)
-
-      // Determine active section
-      for (const item of navItems) {
-        const el = document.getElementById(item.id)
-        if (el) {
-          const rect = el.getBoundingClientRect()
-          if (rect.top <= 200 && rect.bottom > 200) {
-            setActiveSection(item.id)
-            break
-          }
-        }
-      }
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  const scrollTo = (id: string) => {
-    const el = document.getElementById(id)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' })
-      setMenuOpen(false)
-    }
-  }
 
   return (
     <>
       <motion.nav
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        transition={{ delay: 3, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          scrolled
-            ? 'bg-background/90 backdrop-blur-md border-b border-foreground/5'
-            : 'bg-transparent'
-        }`}
+        transition={{ delay: 0.3, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b border-foreground/5"
       >
         <div className="flex items-center justify-between px-6 md:px-16 lg:px-24 h-14">
           {/* Logo */}
-          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-sm font-black tracking-[-0.02em]">
+          <Link href="/" className="text-sm font-black tracking-[-0.02em] hover:opacity-70 transition-opacity">
             NKOLA<span className="text-accent">.</span>
-          </button>
+          </Link>
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-8">
             {navItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => scrollTo(item.id)}
+              <Link
+                key={item.href}
+                href={item.href}
                 className={`text-[11px] font-mono tracking-[0.2em] uppercase transition-colors ${
-                  activeSection === item.id
+                  pathname === item.href
                     ? 'text-foreground'
                     : 'text-foreground/30 hover:text-foreground/60'
                 }`}
               >
                 {item.label}
-              </button>
+              </Link>
             ))}
           </div>
 
@@ -112,16 +80,20 @@ export function Navigation() {
           >
             <div className="flex flex-col items-center gap-8">
               {navItems.map((item, i) => (
-                <motion.button
-                  key={item.id}
+                <motion.div
+                  key={item.href}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.08 }}
-                  onClick={() => scrollTo(item.id)}
-                  className="text-3xl font-black tracking-tight"
                 >
-                  {item.label}
-                </motion.button>
+                  <Link
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="text-3xl font-black tracking-tight"
+                  >
+                    {item.label}
+                  </Link>
+                </motion.div>
               ))}
             </div>
           </motion.div>
