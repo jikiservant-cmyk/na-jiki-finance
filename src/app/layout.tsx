@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NKOLA — Brand & Design Studio | Payment Infrastructure",
-  description: "A design monograph showcasing brand systems, type design, and payment infrastructure for East Africa's digital economy.",
-  keywords: ["brand design", "type design", "payment service", "East Africa", "SACCO", "fintech"],
+  title: "NKOLA Pay — Payment Dashboard",
+  description: "Centralized payment service dashboard for SACCO, Church, and School platforms. Track revenue, transactions, and webhooks across all applications.",
+  keywords: ["payment service", "fintech", "SACCO", "church", "school", "LivePay", "dashboard", "East Africa"],
   icons: {
     icon: "/logo.svg",
   },

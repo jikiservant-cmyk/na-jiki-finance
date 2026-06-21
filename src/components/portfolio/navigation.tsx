@@ -6,11 +6,9 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const navItems = [
-  { href: '/work', label: 'Work' },
-  { href: '/type', label: 'Type' },
-  { href: '/talks', label: 'Talks' },
-  { href: '/payments', label: 'Payments' },
-  { href: '/contact', label: 'Contact' },
+  { href: '/', label: 'Dashboard' },
+  { href: '/transactions', label: 'Transactions' },
+  { href: '/webhooks', label: 'Webhooks' },
 ]
 
 export function Navigation() {
@@ -19,19 +17,12 @@ export function Navigation() {
 
   return (
     <>
-      <motion.nav
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ delay: 0.3, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b border-foreground/5"
-      >
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b border-foreground/5">
         <div className="flex items-center justify-between px-6 md:px-16 lg:px-24 h-14">
-          {/* Logo */}
           <Link href="/" className="text-sm font-black tracking-[-0.02em] hover:opacity-70 transition-opacity">
-            NKOLA<span className="text-accent">.</span>
+            NKOLA<span className="text-accent">.</span> Pay
           </Link>
 
-          {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-8">
             {navItems.map(item => (
               <Link
@@ -48,28 +39,22 @@ export function Navigation() {
             ))}
           </div>
 
-          {/* Mobile menu toggle */}
+          <div className="hidden md:flex items-center gap-4">
+            <div className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="text-[10px] font-mono text-foreground/30">Live</span>
+          </div>
+
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="md:hidden flex flex-col gap-1.5 w-6"
           >
-            <motion.span
-              animate={menuOpen ? { rotate: 45, y: 5 } : { rotate: 0, y: 0 }}
-              className="h-px bg-foreground/70 w-full origin-center"
-            />
-            <motion.span
-              animate={menuOpen ? { opacity: 0 } : { opacity: 1 }}
-              className="h-px bg-foreground/70 w-full"
-            />
-            <motion.span
-              animate={menuOpen ? { rotate: -45, y: -5 } : { rotate: 0, y: 0 }}
-              className="h-px bg-foreground/70 w-full origin-center"
-            />
+            <motion.span animate={menuOpen ? { rotate: 45, y: 5 } : { rotate: 0, y: 0 }} className="h-px bg-foreground/70 w-full origin-center" />
+            <motion.span animate={menuOpen ? { opacity: 0 } : { opacity: 1 }} className="h-px bg-foreground/70 w-full" />
+            <motion.span animate={menuOpen ? { rotate: -45, y: -5 } : { rotate: 0, y: 0 }} className="h-px bg-foreground/70 w-full origin-center" />
           </button>
         </div>
-      </motion.nav>
+      </nav>
 
-      {/* Mobile menu */}
       <AnimatePresence>
         {menuOpen && (
           <motion.div
@@ -80,19 +65,8 @@ export function Navigation() {
           >
             <div className="flex flex-col items-center gap-8">
               {navItems.map((item, i) => (
-                <motion.div
-                  key={item.href}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.08 }}
-                >
-                  <Link
-                    href={item.href}
-                    onClick={() => setMenuOpen(false)}
-                    className="text-3xl font-black tracking-tight"
-                  >
-                    {item.label}
-                  </Link>
+                <motion.div key={item.href} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
+                  <Link href={item.href} onClick={() => setMenuOpen(false)} className="text-3xl font-black tracking-tight">{item.label}</Link>
                 </motion.div>
               ))}
             </div>

@@ -38,7 +38,6 @@ export async function GET() {
       providerRevenue[key].count += 1
     }
 
-    // Daily revenue for the last 14 days
     const dailyRevenue: { date: string; revenue: number; count: number }[] = []
     for (let i = 13; i >= 0; i--) {
       const date = new Date()
@@ -46,11 +45,9 @@ export async function GET() {
       const dateStr = date.toISOString().split('T')[0]
       const dayStart = new Date(dateStr + 'T00:00:00')
       const dayEnd = new Date(dateStr + 'T23:59:59')
-      
       const dayPayments = revenueByApp.filter(p => 
         p.completedAt && p.completedAt >= dayStart && p.completedAt <= dayEnd
       )
-      
       dailyRevenue.push({
         date: dateStr,
         revenue: dayPayments.reduce((sum, p) => sum + p.amount, 0),
@@ -58,15 +55,18 @@ export async function GET() {
       })
     }
 
-    const recentPayments = payments.slice(0, 20).map(p => ({
+    const recentPayments = payments.slice(0, 50).map(p => ({
       id: p.id,
       reference: p.reference,
       application: p.application.displayName,
+      applicationName: p.application.name,
       paymentType: p.paymentType,
       amount: p.amount,
       currency: p.currency,
       status: p.status,
       provider: p.provider,
+      tenantId: p.tenantId,
+      customerId: p.customerId,
       createdAt: p.createdAt,
       completedAt: p.completedAt,
     }))
