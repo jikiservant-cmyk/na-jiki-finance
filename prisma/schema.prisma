@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Application {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  webhookUrl  String?
+  apiKey      String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  payments    Payment[]
+}
+
+model Payment {
+  id                String            @id @default(cuid())
+  reference         String            @unique
+  applicationId     String
+  application       Application       @relation(fields: [applicationId], references: [id])
+  tenantId          String?
+  customerId        String?
+  paymentType       String
+  amount            Float
+  currency          String            @default("UGX")
+  status            String            @default("PENDING")
+  provider          String?
+  providerReference String?
+  providerResponse  String?
+  completedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  webhookLogs       WebhookLog[]
+  transactions      PaymentTransaction[]
+}
+
+model PaymentTransaction {
+  id          String   @id @default(cuid())
+  paymentId   String
+  payment     Payment  @relation(fields: [paymentId], references: [id])
+  type        String
+  status      String
+  amount      Float
+  metadata    String?
+  createdAt   DateTime @default(now())
+}
+
+model WebhookLog {
+  id          String   @id @default(cuid())
+  paymentId   String?
+  payment     Payment? @relation(fields: [paymentId], references: [id])
+  provider    String
+  eventType   String
+  payload     String
+  signature   String?
+  verified    Boolean  @default(false)
+  processed   Boolean  @default(false)
+  error       String?
+  createdAt   DateTime @default(now())
+}
+
+model PortfolioProject {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  category    String
+  year        String
+  description String
+  editorial   String
+  colorPrimary String?
+  colorSecondary String?
+  colorTertiary String?
+  imageUrl    String?
+  sortOrder   Int      @default(0)
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
