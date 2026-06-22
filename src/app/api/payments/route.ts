@@ -17,13 +17,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid or inactive application' }, { status: 404 })
     }
 
-    // 3. Find tenant (optional) - using tenantCode as the UUID id
+    // 3. Find tenant (optional) - using tenantCode
     let tenant: Awaited<ReturnType<typeof db.tenant.findFirst>> = null
     if (validatedBody.tenantCode) {
       tenant = await db.tenant.findFirst({
         where: { 
-          id: validatedBody.tenantCode, // tenantCode is the UUID
-          appType: validatedBody.applicationCode // appType should match application code
+          applicationId: application.id,
+          code: validatedBody.tenantCode,
+          appType: validatedBody.applicationCode,
+          isActive: true
         },
       })
       if (!tenant) {

@@ -1,4 +1,5 @@
 import { db } from '../src/lib/db'
+import type { PaymentStatus } from '@prisma/client'
 
 async function seed() {
   // === PROVIDERS ===
@@ -28,16 +29,16 @@ async function seed() {
 
   // === TENANTS ===
   const abcSacco = await db.tenant.create({
-    data: { applicationId: sacco.id, code: 'abc-sacco', name: 'ABC SACCO', defaultProviderId: livepay.id, isActive: true },
+    data: { applicationId: sacco.id, code: 'abc-sacco', appType: sacco.code, name: 'ABC SACCO', defaultProviderId: livepay.id, isActive: true },
   })
   const xyzSacco = await db.tenant.create({
-    data: { applicationId: sacco.id, code: 'xyz-sacco', name: 'XYZ SACCO', defaultProviderId: mtn.id, isActive: true },
+    data: { applicationId: sacco.id, code: 'xyz-sacco', appType: sacco.code, name: 'XYZ SACCO', defaultProviderId: mtn.id, isActive: true },
   })
   const graceChurch = await db.tenant.create({
-    data: { applicationId: church.id, code: 'grace-church', name: 'Grace Community Church', defaultProviderId: livepay.id, isActive: true },
+    data: { applicationId: church.id, code: 'grace-church', appType: church.code, name: 'Grace Community Church', defaultProviderId: livepay.id, isActive: true },
   })
   const hopeAcademy = await db.tenant.create({
-    data: { applicationId: school.id, code: 'hope-academy', name: 'Hope Academy', defaultProviderId: pesapal.id, isActive: true },
+    data: { applicationId: school.id, code: 'hope-academy', appType: school.code, name: 'Hope Academy', defaultProviderId: pesapal.id, isActive: true },
   })
 
   // === PAYMENT TYPES ===
@@ -51,7 +52,7 @@ async function seed() {
   // === PAYMENT INTENTS (last 14 days) ===
   const providers = [livepay, mtn, airtel, pesapal]
   const tenants = [abcSacco, xyzSacco, graceChurch, hopeAcademy]
-  const statusWeights = ['pending', 'pending', 'processing', 'success', 'success', 'success', 'success', 'success', 'failed', 'expired']
+  const statusWeights: PaymentStatus[] = ['pending', 'pending', 'processing', 'success', 'success', 'success', 'success', 'success', 'failed', 'expired']
 
   const appConfig = [
     { app: sacco, types: [saccoDeposit, saccoLoan], tenantPool: [abcSacco, xyzSacco], prefix: 'SACCO' },
