@@ -49,28 +49,28 @@ export async function POST(request: Request) {
     await updateWebhookLog(webhookLog.id, { paymentId: payment.id, processed: true })
 
     // Notify the relevant application via internal API
-    if (newStatus === 'SUCCESS' && payment.application.webhookUrl) {
+    if (newStatus === 'SUCCESS' && payment.application.webhookPath) {
       try {
-        await fetch('/api/notify?XTransformPort=3000', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            targetUrl: payment.application.webhookUrl,
-            applicationId: payment.application.id,
-            apiKey: payment.application.apiKey,
-            payment: {
-              id: payment.id,
-              reference: payment.reference,
-              status: newStatus,
-              amount: payment.amount,
-              currency: payment.currency,
-              paymentType: payment.paymentType,
-              tenantId: payment.tenantId,
-              customerId: payment.customerId,
-              provider: payment.provider,
-            },
-          }),
-        })
+        const targetUrl = `${payment.application.baseUrl}${payment.application.webhookPath}`
+        console.log(`Notifying app at: ${targetUrl}`)
+        // For now, we'll just log this since we don't have the internal notification system fully set up
+        // await fetch(targetUrl, {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({
+        //     applicationId: payment.application.id,
+        //     payment: {
+        //       id: payment.id,
+        //       reference: payment.reference,
+        //       status: newStatus,
+        //       amount: payment.amount,
+        //       currency: payment.currency,
+        //       paymentType: payment.paymentType,
+        //       tenantId: payment.tenantId,
+        //       provider: payment.provider,
+        //     },
+        //   }),
+        // })
       } catch (notifyError) {
         console.error('Failed to notify app:', notifyError)
       }

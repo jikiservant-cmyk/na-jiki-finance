@@ -155,7 +155,7 @@ export async function getDashboardData() {
 
     dailyRevenue.push({
       date: dateStr,
-      revenue: daySuccess._sum.amount || 0,
+      revenue: daySuccess._sum.amount ? Number(daySuccess._sum.amount) : 0,
       count: daySuccess._count,
       failed: dayFailed
     })

@@ -59,7 +59,7 @@ export default function TransactionsPage() {
     return true
   })
 
-  const paymentTypes = [...new Set(payments.map(p => p.paymentType).filter(Boolean))]
+  const paymentTypes = [...new Set(payments.map(p => p.paymentType).filter((t): t is string => t !== null))]
   const totalFiltered = filtered.reduce((s, p) => s + p.amount, 0)
   const successFiltered = filtered.filter(p => p.status === 'success').length
 

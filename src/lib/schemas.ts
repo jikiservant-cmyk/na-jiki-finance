@@ -42,7 +42,7 @@ export const CreatePaymentRequestSchema = z.object({
 
   // Opaque passthrough. Payment Service never reads these keys, just
   // stores and echoes them back in the completion notification.
-  metadata: z.record(z.unknown()).optional().default({}),
+  metadata: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 export type CreatePaymentRequest = z.infer<typeof CreatePaymentRequestSchema>;
@@ -98,7 +98,7 @@ export const InternalNotificationPayloadSchema = z.object({
   amount: z.number().positive(),
   currency: z.string().length(3),
   externalEntityId: z.string().nullable(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
   providerPaymentId: z.string().nullable(),
   failureReason: z.string().nullable(),
 });

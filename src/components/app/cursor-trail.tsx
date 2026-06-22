@@ -3,8 +3,9 @@
 import { useEffect, useRef } from 'react'
 
 export function CursorTrail() {
+  const posRef = useRef({ x: 0, y: 0 })
+  
   useEffect(() => {
-    const posRef = { x: 0, y: 0 }
     const DOT_COUNT = 10
 
     const handleMouseMove = (e: MouseEvent) => {
