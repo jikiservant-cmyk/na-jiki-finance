@@ -38,8 +38,8 @@ const fmtDate = (d: string | Date) => {
 }
 
 // NEW COLOR PALETTE — vibrant teal/cyan family
-const appColors: Record<string, string> = { sacco: '#2dd4bf', church: '#fbbf24', school: '#f97316' }
-const provColors: Record<string, string> = { livepay: '#2dd4bf', mtn: '#fbbf24', airtel: '#f87171', pesapal: '#a78bfa' }
+const appColors: Record<string, string> = { sacco: '#4ade80', church: '#fbbf24', school: '#fb923c' }
+const provColors: Record<string, string> = { livepay: '#4ade80', mtn: '#fbbf24', airtel: '#f87171', pesapal: '#a78bfa' }
 const statusColors: Record<string, string> = {
   success: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20',
   pending: 'bg-amber-500/15 text-amber-400 border border-amber-500/20',
@@ -186,7 +186,7 @@ export default function HomePage() {
 
             {/* Top stats */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <StatCard label="Total Revenue" value={fmt(data.totalRevenue)} sub={`${data.totalPayments} intents`} accent="#2dd4bf" delay={1.6} />
+              <StatCard label="Total Revenue" value={fmt(data.totalRevenue)} sub={`${data.totalPayments} intents`} accent="#4ade80" delay={1.6} />
               <StatCard label="Success Rate" value={`${data.successRate}%`} sub={`${data.statusCounts.success} successful`} accent="#34d399" delay={1.7} />
               <StatCard label="Processing" value={String(data.statusCounts.processing)} sub="Awaiting customer" delay={1.8} />
               <StatCard label="Pending" value={String(data.statusCounts.pending)} sub="Not yet sent" delay={1.9} />
@@ -294,7 +294,7 @@ export default function HomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.2 }} className="stat-card p-4 md:p-6 bg-card border border-border/50 rounded-xl">
                 <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase block mb-4">Daily Revenue — 14 Days</span>
-                <BarChart data={data.dailyRevenue.map(d => d.revenue)} maxVal={maxDaily} color="#2dd4bf" failData={data.dailyRevenue.map(d => d.failed)} />
+                <BarChart data={data.dailyRevenue.map(d => d.revenue)} maxVal={maxDaily} color="#4ade80" failData={data.dailyRevenue.map(d => d.failed)} />
                 <div className="flex justify-between mt-2">
                   <span className="text-[10px] font-mono text-muted-foreground">14 days ago</span>
                   <span className="text-[10px] font-mono text-muted-foreground">Today</span>
@@ -441,7 +441,7 @@ export default function HomePage() {
 
       <footer className="px-6 md:px-16 lg:px-24 py-6 border-t border-border/30 mt-8">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono text-muted-foreground">NKOLA Pay — Payment Service v2.0</span>
+          <span className="text-[10px] font-mono text-muted-foreground">Na&apos;jiki Tech — Payment Service</span>
           <span className="text-[10px] font-mono text-muted-foreground">{new Date().getFullYear()}</span>
         </div>
       </footer>

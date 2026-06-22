@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NKOLA Pay — Payment Dashboard",
-  description: "Centralized payment service dashboard for SACCO, Church, and School platforms. Track revenue, transactions, and webhooks across all applications.",
-  keywords: ["payment service", "fintech", "SACCO", "church", "school", "LivePay", "dashboard", "East Africa"],
+  title: "Na'jiki Tech — Payment Dashboard",
+  description: "Na'jiki Tech payment service dashboard for SACCO, Church, and School platforms. Track revenue, transactions, and webhooks across all applications.",
+  keywords: ["Na'jiki Tech", "payment service", "fintech", "SACCO", "church", "school", "LivePay", "dashboard", "East Africa"],
   icons: {
     icon: "/logo.svg",
   },

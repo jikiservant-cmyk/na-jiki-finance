@@ -28,7 +28,7 @@ const fmtDate = (d: string | Date) => {
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-const appColors: Record<string, string> = { sacco: '#2dd4bf', church: '#fbbf24', school: '#f97316' }
+const appColors: Record<string, string> = { sacco: '#4ade80', church: '#fbbf24', school: '#fb923c' }
 const statusColors: Record<string, string> = { success: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20', pending: 'bg-amber-500/15 text-amber-400 border border-amber-500/20', processing: 'bg-sky-500/15 text-sky-400 border border-sky-500/20', failed: 'bg-red-500/15 text-red-400 border border-red-500/20', expired: 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20', cancelled: 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20' }
 
 export default function TransactionsPage() {
@@ -134,7 +134,7 @@ export default function TransactionsPage() {
       </div>
       <footer className="px-6 md:px-16 lg:px-24 py-6 border-t border-foreground/5 mt-auto">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono text-foreground/20">NKOLA Pay — Payment Service v2.0</span>
+          <span className="text-[10px] font-mono text-foreground/20">Na&apos;jiki Tech — Payment Service</span>
           <span className="text-[10px] font-mono text-foreground/20">{new Date().getFullYear()}</span>
         </div>
       </footer>

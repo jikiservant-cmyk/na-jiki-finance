@@ -39,7 +39,7 @@ export function Navigation() {
               transition={{ delay: 0.6, duration: 0.4 }}
               className="text-sm font-black tracking-tight group-hover:text-primary transition-colors"
             >
-              NKOLA<span className="text-primary">.Pay</span>
+              Na&apos;jiki<span className="text-primary"> Tech</span>
             </motion.span>
           </Link>
 

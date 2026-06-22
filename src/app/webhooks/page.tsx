@@ -23,7 +23,7 @@ const fmtDate = (d: string | Date) => {
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-const provColors: Record<string, string> = { livepay: '#2dd4bf', mtn: '#fbbf24', airtel: '#f87171', pesapal: '#a78bfa' }
+const provColors: Record<string, string> = { livepay: '#4ade80', mtn: '#fbbf24', airtel: '#f87171', pesapal: '#a78bfa' }
 
 export default function WebhooksPage() {
   const [logs, setLogs] = useState<WebhookLog[]>([])
@@ -163,7 +163,7 @@ export default function WebhooksPage() {
       </div>
       <footer className="px-6 md:px-16 lg:px-24 py-6 border-t border-foreground/5 mt-auto">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono text-foreground/20">NKOLA Pay — Payment Service v2.0</span>
+          <span className="text-[10px] font-mono text-foreground/20">Na&apos;jiki Tech — Payment Service</span>
           <span className="text-[10px] font-mono text-foreground/20">{new Date().getFullYear()}</span>
         </div>
       </footer>
