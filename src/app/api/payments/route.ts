@@ -77,7 +77,7 @@ export async function POST(request: Request) {
         phoneNumber: validatedBody.phoneNumber,
         providerId: provider.id,
         status: 'pending',
-        metadata: validatedBody.metadata || {},
+        metadata: (validatedBody.metadata || {}) as any,
       },
       include: {
         application: true,
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       data: {
         paymentIntentId: paymentIntent.id,
         status: providerResponse.status,
-        rawProviderResponse: providerResponse,
+        rawProviderResponse: providerResponse as any,
         note: 'PAYMENT_INITIATED',
       },
     })

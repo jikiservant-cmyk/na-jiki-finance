@@ -112,16 +112,14 @@ export async function getDashboardData() {
   const tenantIds = tenantRevenueData.map(i => i.tenantId!).filter(Boolean)
   const tenants = await db.tenant.findMany({
     where: { id: { in: tenantIds } },
-    include: { application: true }
   })
   const tenantMap = new Map(tenants.map(t => [t.id, t]))
 
   const tenantRevenue = tenantRevenueData.map(i => {
     const tenant = tenantMap.get(i.tenantId!)
     return {
-      code: tenant?.code || 'unknown',
+      appType: tenant?.appType || 'unknown',
       name: tenant?.name || 'Unknown',
-      application: tenant?.application.code || 'unknown',
       revenue: i._sum.amount || 0,
       count: i._count
     }
@@ -198,7 +196,7 @@ export async function getDashboardData() {
     application: i.application.name,
     applicationCode: i.application.code,
     tenantName: i.tenant?.name || null,
-    tenantCode: i.tenant?.code || null,
+    tenantAppType: i.tenant?.appType || null,
     paymentType: i.paymentType?.code || null,
     amount: i.amount,
     currency: i.currency,
@@ -316,7 +314,7 @@ export async function updatePaymentStatus(
   externalRef?: string,
   metadata?: string
 ) {
-  const normalizedStatus = status.toLowerCase()
+  const normalizedStatus = status.toLowerCase() as any
   const updateData: Record<string, unknown> = {
     status: normalizedStatus,
   }
@@ -385,7 +383,7 @@ export async function createPaymentTransaction(data: {
   return db.paymentTransaction.create({
     data: {
       paymentIntentId: data.paymentId,
-      status: data.status.toLowerCase(),
+      status: data.status.toLowerCase() as any,
       rawProviderResponse: data.metadata,
       note: data.type,
     },

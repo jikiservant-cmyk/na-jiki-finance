@@ -5,7 +5,6 @@ export async function GET() {
   try {
     const applications = await db.application.findMany({
       include: {
-        tenants: true,
         paymentTypes: true,
       },
     })

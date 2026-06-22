@@ -12,7 +12,7 @@ export async function GET(
       where: { reference },
       include: {
         application: { select: { id: true, code: true, name: true } },
-        tenant: { select: { id: true, code: true, name: true } },
+        tenant: { select: { id: true, appType: true, name: true } },
         provider: { select: { id: true, code: true, name: true } },
         paymentType: { select: { id: true, code: true, description: true } },
       },
