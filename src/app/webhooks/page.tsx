@@ -23,7 +23,7 @@ const fmtDate = (d: string | Date) => {
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-const provColors: Record<string, string> = { livepay: '#52B788', mtn: '#F59E0B', airtel: '#EF4444', pesapal: '#3B82F6' }
+const provColors: Record<string, string> = { livepay: '#2dd4bf', mtn: '#fbbf24', airtel: '#f87171', pesapal: '#a78bfa' }
 
 export default function WebhooksPage() {
   const [logs, setLogs] = useState<WebhookLog[]>([])

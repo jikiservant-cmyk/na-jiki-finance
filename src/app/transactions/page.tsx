@@ -28,8 +28,8 @@ const fmtDate = (d: string | Date) => {
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-const appColors: Record<string, string> = { sacco: '#52B788', church: '#F59E0B', school: '#EA580C' }
-const statusColors: Record<string, string> = { success: 'bg-green-500/10 text-green-400', pending: 'bg-yellow-500/10 text-yellow-400', processing: 'bg-blue-500/10 text-blue-400', failed: 'bg-red-500/10 text-red-400', expired: 'bg-gray-500/10 text-gray-400', cancelled: 'bg-gray-500/10 text-gray-400' }
+const appColors: Record<string, string> = { sacco: '#2dd4bf', church: '#fbbf24', school: '#f97316' }
+const statusColors: Record<string, string> = { success: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20', pending: 'bg-amber-500/15 text-amber-400 border border-amber-500/20', processing: 'bg-sky-500/15 text-sky-400 border border-sky-500/20', failed: 'bg-red-500/15 text-red-400 border border-red-500/20', expired: 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20', cancelled: 'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20' }
 
 export default function TransactionsPage() {
   const [data, setData] = useState<DashboardData | null>(null)
