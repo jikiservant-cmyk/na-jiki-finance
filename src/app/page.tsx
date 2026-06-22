@@ -4,6 +4,9 @@ import { useEffect, useState, useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import { Navigation } from '@/components/app/navigation'
 import { CursorTrail } from '@/components/app/cursor-trail'
+import { FloatingGeometry } from '@/components/app/floating-geometry'
+import { TiltCard } from '@/components/app/tilt-card'
+import { PaymentFlow3D } from '@/components/app/payment-flow-3d'
 import Link from 'next/link'
 
 interface DashboardData {
@@ -129,7 +132,8 @@ export default function HomePage() {
   const maxDaily = data ? Math.max(...data.dailyRevenue.map(d => d.revenue), 1) : 1
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen relative">
+      <FloatingGeometry />
       <CursorTrail />
       <Navigation />
 
@@ -184,14 +188,37 @@ export default function HomePage() {
         ) : data && (
           <div className="px-6 md:px-16 lg:px-24 py-4 space-y-6">
 
-            {/* Top stats */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <StatCard label="Total Revenue" value={fmt(data.totalRevenue)} sub={`${data.totalPayments} intents`} accent="#4ade80" delay={1.6} />
-              <StatCard label="Success Rate" value={`${data.successRate}%`} sub={`${data.statusCounts.success} successful`} accent="#34d399" delay={1.7} />
-              <StatCard label="Processing" value={String(data.statusCounts.processing)} sub="Awaiting customer" delay={1.8} />
-              <StatCard label="Pending" value={String(data.statusCounts.pending)} sub="Not yet sent" delay={1.9} />
-              <StatCard label="Failed" value={String(data.statusCounts.failed)} sub="Needs attention" accent="#f87171" delay={2.0} />
-              <StatCard label="Expired" value={String(data.statusCounts.expired)} sub="Timed out" delay={2.1} />
+            {/* Top stats — 3D tilt cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 scene-3d">
+              {[
+                { label: 'Total Revenue', value: fmt(data.totalRevenue), sub: `${data.totalPayments} intents`, accent: '#4ade80', delay: 1.6 },
+                { label: 'Success Rate', value: `${data.successRate}%`, sub: `${data.statusCounts.success} successful`, accent: '#34d399', delay: 1.7 },
+                { label: 'Processing', value: String(data.statusCounts.processing), sub: 'Awaiting customer', delay: 1.8 },
+                { label: 'Pending', value: String(data.statusCounts.pending), sub: 'Not yet sent', delay: 1.9 },
+                { label: 'Failed', value: String(data.statusCounts.failed), sub: 'Needs attention', accent: '#f87171', delay: 2.0 },
+                { label: 'Expired', value: String(data.statusCounts.expired), sub: 'Timed out', delay: 2.1 },
+              ].map((stat, i) => (
+                <TiltCard key={stat.label} tiltAmount={8}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: stat.delay, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                    className="p-4 md:p-5 bg-card border border-border/50 rounded-xl"
+                  >
+                    <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase">{stat.label}</span>
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: stat.delay + 0.2, duration: 0.4 }}
+                      className="text-xl md:text-2xl font-black tracking-tight mt-1"
+                      style={stat.accent ? { color: stat.accent } : {}}
+                    >
+                      {stat.value}
+                    </motion.div>
+                    {stat.sub && <span className="text-[10px] font-mono text-muted-foreground mt-1 block">{stat.sub}</span>}
+                  </motion.div>
+                </TiltCard>
+              ))}
             </div>
 
             {/* Revenue by app + Funnel */}
@@ -371,34 +398,13 @@ export default function HomePage() {
               </motion.div>
             </div>
 
-            {/* Architecture */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 4 }} className="stat-card p-4 md:p-6 bg-card border border-border/50 rounded-xl">
-              <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase block mb-4">Architecture Overview</span>
-              <pre className="font-mono text-[11px] text-muted-foreground leading-loose text-center overflow-x-auto">
-{`         ┌─────────────┐
-         │   LivePay    │
-         └──────┬──────┘
-                │ webhook
-                ▼
-   ┌────────────────────────┐
-   │   Payment Service      │
-   │   payment_intents      │
-   │   payment_transactions │  ← append-only audit log
-   │   webhook_logs         │  ← every webhook, valid or not
-   │   internal_notifications│ ← retry-safe delivery
-   └────────┬───────────────┘
-        ┌───┴───┐
-        ▼       ▼
-   ┌────────┐ ┌────────┐ ┌────────┐
-   │ SACCO  │ │ Church │ │ School │
-   │  App   │ │  App   │ │  App   │
-   └───┬────┘ └───┬────┘ └───┬────┘
-       ▼          ▼          ▼
-    Update DB  Update DB  Update DB
-
-   Routing: application_id + tenant_id (NOT string-parsing)
-   Idempotency: idempotency_key on payment_intents`}
-              </pre>
+            {/* 3D Architecture Flow */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 4 }} className="glass-3d p-4 md:p-6 rounded-xl">
+              <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase block mb-4">Architecture Overview — 3D Payment Flow</span>
+              <PaymentFlow3D />
+              <p className="text-[10px] font-mono text-muted-foreground text-center mt-3">
+                Routing by application_id + tenant_id (NOT string-parsing) · Idempotency: idempotency_key on payment_intents
+              </p>
             </motion.div>
 
             {/* Recent transactions */}

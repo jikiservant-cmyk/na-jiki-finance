@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Navigation } from '@/components/app/navigation'
+import { FloatingGeometry } from '@/components/app/floating-geometry'
+import { CursorTrail } from '@/components/app/cursor-trail'
 
 interface PaymentIntent {
   id: string; reference: string; application: string; applicationCode: string
@@ -55,7 +57,9 @@ export default function TransactionsPage() {
   const successFiltered = filtered.filter(p => p.status === 'success').length
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen relative">
+      <FloatingGeometry />
+      <CursorTrail />
       <Navigation />
       <div className="pt-14">
         <div className="px-6 md:px-16 lg:px-24 pt-8 pb-4">
