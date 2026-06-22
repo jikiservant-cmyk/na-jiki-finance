@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { motion, useInView } from 'framer-motion'
+import { useEffect, useState, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { Navigation } from '@/components/app/navigation'
 import { CursorTrail } from '@/components/app/cursor-trail'
 import { FloatingGeometry } from '@/components/app/floating-geometry'
 import { TiltCard } from '@/components/app/tilt-card'
 import { PaymentFlow3D } from '@/components/app/payment-flow-3d'
 import Link from 'next/link'
+import { useRealtimeDashboard } from '@/hooks/useRealtimeDashboard'
 
 interface DashboardData {
   totalRevenue: number
@@ -130,9 +131,13 @@ export default function HomePage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     fetch('/api/dashboard').then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
   }, [])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  const { events, connected } = useRealtimeDashboard(refresh)
 
   const safeData = data || {
     totalRevenue: 0,
@@ -194,6 +199,13 @@ export default function HomePage() {
             >
               <p className="text-sm text-muted-foreground">Payment Service — multi-app, multi-tenant, multi-provider</p>
               <div className="flex items-center gap-3">
+                {/* Realtime Connection Status */}
+                <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+                  connected ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/15 text-red-400 border border-red-500/20'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                  {connected ? 'Live' : 'Reconnecting...'}
+                </div>
                 <div className="w-2 h-2 rounded-full bg-emerald-400 pulse-live" />
                 <span className="text-[10px] font-mono text-muted-foreground">All systems operational</span>
               </div>
@@ -472,6 +484,44 @@ export default function HomePage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </motion.div>
+
+            {/* Live Feed */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 4.5 }} className="stat-card p-4 md:p-6 bg-card border border-border/50 rounded-xl">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase">Live Feed</span>
+              </div>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {events.map((event, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center gap-3 text-xs p-3 bg-foreground/[0.02] rounded-lg border border-border/30"
+                  >
+                    <span className="text-lg">
+                      {event.type === 'payment' ? '💳' : event.type === 'webhook' ? '🔔' : '📢'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-muted-foreground font-mono">{event.timestamp.toLocaleTimeString()}</span>
+                      <span className="ml-2 font-medium">
+                        {event.type === 'payment'
+                          ? `Payment ${(event.payload.status as string) || 'updated'} — ${(event.payload.reference as string) || 'Unknown'}`
+                          : event.type === 'webhook'
+                          ? `Webhook received`
+                          : `Notification ${(event.payload.status as string) || 'updated'}`
+                        }
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+                {events.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <p>No live events yet</p>
+                    <p className="text-xs mt-1">Events will appear here as they happen</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
