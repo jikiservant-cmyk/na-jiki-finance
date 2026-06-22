@@ -31,3 +31,25 @@ Stage Summary:
 - Supabase integration with automatic fallback to Prisma/SQLite
 - SQL migration script ready for Supabase deployment
 - All pages verified working in browser
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix hydration mismatch from Math.random() and change background shapes to codes/bio/math symbols
+
+Work Log:
+- Rewrote /src/components/app/floating-geometry.tsx — replaced all SVG geometric shapes (cube, ring, diamond, hexagon, triangle, wireframe sphere) with floating science/code/math symbol characters: π, ∫, { }, DNA, ∑, ∇, </>, λ, ∞, ATCG
+- Eliminated all Math.random() calls that caused hydration mismatch (server vs client render differed)
+- Used deterministic DOT_CONFIGS array for scattered mini-symbol positions instead of Math.random()
+- Added `mounted` state guard so dots only render on client (preventing SSR/client mismatch)
+- Updated .geo-shape CSS class — removed border styling, adjusted opacity for text symbols, added font-weight and letter-spacing
+- Fixed missing exports in /src/lib/data.ts: added getPaymentsWithApps, updatePaymentStatus, createWebhookLog, updateWebhookLog, createPaymentTransaction
+- Aligned createWebhookLog and createPaymentTransaction with actual Prisma schema (no PaymentTransactionType model, providerId required, etc.)
+- Build compiles cleanly with no errors
+- Dev server verified — page loads with 200 status, symbols render in background
+
+Stage Summary:
+- Hydration mismatch resolved — no more Math.random() in component rendering
+- Background now shows floating code/bio/math symbols instead of geometric SVG shapes
+- Missing data layer exports added, webhook route no longer fails on build
+- Clean production build confirmed

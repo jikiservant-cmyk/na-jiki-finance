@@ -194,3 +194,98 @@ export async function getPendingNotifications() {
     orderBy: { createdAt: 'asc' },
   })
 }
+
+// ===== PAYMENT HELPERS (for webhook processing) =====
+
+export async function getPaymentsWithApps() {
+  return db.paymentIntent.findMany({
+    include: {
+      application: true,
+      tenant: true,
+      provider: true,
+      paymentType: true,
+    },
+  })
+}
+
+export async function updatePaymentStatus(
+  reference: string,
+  status: string,
+  externalRef?: string,
+  metadata?: string
+) {
+  const normalizedStatus = status.toLowerCase()
+  const updateData: Record<string, unknown> = {
+    status: normalizedStatus,
+  }
+  if (externalRef) updateData.externalEntityId = externalRef
+  if (normalizedStatus === 'success' || normalizedStatus === 'failed') {
+    updateData.completedAt = new Date()
+  }
+  if (metadata) updateData.failureReason = metadata
+
+  return db.paymentIntent.updateMany({
+    where: { reference },
+    data: updateData,
+  })
+}
+
+export async function createWebhookLog(data: {
+  provider: string
+  eventType: string
+  payload: string
+  signature: string
+  verified: boolean
+  processed: boolean
+}) {
+  // Find provider by code — fallback to first active provider if not found
+  let provider = await db.provider.findFirst({ where: { code: data.provider.toLowerCase() } })
+  if (!provider) {
+    provider = await db.provider.findFirst({ where: { isActive: true } })
+  }
+  if (!provider) {
+    throw new Error(`No provider found for webhook: ${data.provider}`)
+  }
+
+  return db.webhookLog.create({
+    data: {
+      payload: data.payload,
+      headers: JSON.stringify({ signature: data.signature, eventType: data.eventType }),
+      signatureValid: data.verified,
+      processed: data.processed,
+      providerId: provider.id,
+    },
+  })
+}
+
+export async function updateWebhookLog(
+  id: string,
+  data: { paymentId?: string; error?: string; processed?: boolean }
+) {
+  const updateData: Record<string, unknown> = {}
+  if (data.paymentId) updateData.paymentIntentId = data.paymentId
+  if (data.error) updateData.processingError = data.error
+  if (data.processed !== undefined) updateData.processed = data.processed
+
+  return db.webhookLog.update({
+    where: { id },
+    data: updateData,
+  })
+}
+
+export async function createPaymentTransaction(data: {
+  paymentId: string
+  type: string
+  status: string
+  amount: number
+  metadata: string
+}) {
+  return db.paymentTransaction.create({
+    data: {
+      paymentIntentId: data.paymentId,
+      status: data.status.toLowerCase(),
+      rawProviderResponse: data.metadata,
+      note: data.type,
+    },
+  })
+}

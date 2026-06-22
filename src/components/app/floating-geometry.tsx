@@ -1,93 +1,169 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 
-// Floating 3D geometric shapes that drift in the background
+// Deterministic positions for scattered dots — no Math.random() to avoid hydration mismatch
+const DOT_CONFIGS = [
+  { top: 12, left: 8, opacity: 0.08, yRange: 22, duration: 7, delay: 0 },
+  { top: 25, left: 45, opacity: 0.06, yRange: 18, duration: 9, delay: 1 },
+  { top: 38, left: 78, opacity: 0.09, yRange: 25, duration: 6, delay: 2 },
+  { top: 55, left: 15, opacity: 0.05, yRange: 20, duration: 11, delay: 3 },
+  { top: 68, left: 62, opacity: 0.07, yRange: 15, duration: 8, delay: 0.5 },
+  { top: 80, left: 30, opacity: 0.06, yRange: 28, duration: 10, delay: 1.5 },
+  { top: 15, left: 90, opacity: 0.08, yRange: 20, duration: 7.5, delay: 2.5 },
+  { top: 45, left: 55, opacity: 0.05, yRange: 22, duration: 9.5, delay: 4 },
+  { top: 72, left: 85, opacity: 0.07, yRange: 18, duration: 6.5, delay: 3.5 },
+  { top: 30, left: 22, opacity: 0.06, yRange: 25, duration: 8.5, delay: 1 },
+  { top: 60, left: 40, opacity: 0.09, yRange: 20, duration: 7, delay: 2 },
+  { top: 88, left: 70, opacity: 0.05, yRange: 15, duration: 10.5, delay: 0.8 },
+]
+
+// Science/code/math symbols for floating background
+const SYMBOLS = [
+  // Math
+  { char: 'π', label: 'pi' },
+  { char: '∫', label: 'integral' },
+  { char: '∑', label: 'sigma' },
+  { char: '∂', label: 'partial' },
+  { char: '∞', label: 'infinity' },
+  { char: '∇', label: 'nabla' },
+  { char: 'λ', label: 'lambda' },
+  { char: 'Δ', label: 'delta' },
+  // Code
+  { char: '{ }', label: 'braces' },
+  { char: '</>', label: 'html' },
+  { char: '01', label: 'binary' },
+  { char: 'fn', label: 'function' },
+  { char: '=>', label: 'arrow' },
+  { char: '//', label: 'comment' },
+  // Bio
+  { char: 'DNA', label: 'dna' },
+  { char: 'ATCG', label: 'bases' },
+  { char: 'Ω', label: 'ohm' },
+  { char: 'α', label: 'alpha' },
+]
+
+// Floating science/code/math symbols that drift in the background
 export function FloatingGeometry() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" style={{ perspective: '1200px' }}>
-      {/* Rotating cube — top right */}
-      <div className="geo-shape geo-cube" style={{ top: '10%', right: '8%', width: '80px', height: '80px' }}>
-        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="10" y="10" width="60" height="60" rx="4" stroke="currentColor" strokeWidth="1" opacity="0.5" />
-          <rect x="20" y="20" width="40" height="40" rx="2" stroke="currentColor" strokeWidth="0.5" opacity="0.3" />
-        </svg>
+      {/* Floating π — top right */}
+      <div className="geo-shape geo-cube flex items-center justify-center" style={{ top: '8%', right: '6%', width: '80px', height: '80px', fontSize: '2.5rem', color: 'oklch(0.72 0.19 155)' }}>
+        π
       </div>
 
-      {/* Spinning ring — center left */}
-      <div className="geo-shape geo-ring" style={{ top: '35%', left: '5%', width: '120px', height: '120px' }}>
-        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="60" cy="60" r="50" stroke="currentColor" strokeWidth="1" opacity="0.4" />
-          <circle cx="60" cy="60" r="35" stroke="currentColor" strokeWidth="0.5" opacity="0.2" />
-        </svg>
+      {/* Floating ∫ — center left */}
+      <div className="geo-shape geo-ring flex items-center justify-center" style={{ top: '30%', left: '4%', width: '100px', height: '100px', fontSize: '2.8rem', color: 'oklch(0.72 0.19 155)' }}>
+        ∫
       </div>
 
-      {/* Orbiting diamond — bottom right */}
-      <div className="geo-shape geo-diamond" style={{ bottom: '15%', right: '12%', width: '60px', height: '60px' }}>
-        <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M30 5 L55 30 L30 55 L5 30 Z" stroke="currentColor" strokeWidth="1" opacity="0.4" />
-        </svg>
+      {/* Floating { } — bottom right */}
+      <div className="geo-shape geo-diamond flex items-center justify-center" style={{ bottom: '12%', right: '10%', width: '70px', height: '70px', fontSize: '1.8rem', color: 'oklch(0.72 0.19 155)' }}>
+        {'{ }'}
       </div>
 
-      {/* Slow rotating triangle — top left */}
+      {/* Floating DNA — top left area */}
       <motion.div
-        className="geo-shape"
-        style={{ top: '60%', left: '80%', width: '90px', height: '90px' }}
-        animate={{ rotate: 360, y: [-10, 10, -10] }}
-        transition={{ rotate: { duration: 35, repeat: Infinity, ease: 'linear' }, y: { duration: 8, repeat: Infinity, ease: 'easeInOut' } }}
+        className="geo-shape flex items-center justify-center"
+        style={{ top: '18%', left: '25%', width: '90px', height: '50px', fontSize: '1.4rem', color: 'oklch(0.72 0.19 155)' }}
+        animate={{ rotate: [0, 5, -5, 0], y: [-10, 10, -10] }}
+        transition={{ rotate: { duration: 12, repeat: Infinity, ease: 'easeInOut' }, y: { duration: 8, repeat: Infinity, ease: 'easeInOut' } }}
       >
-        <svg viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M45 10 L80 75 L10 75 Z" stroke="currentColor" strokeWidth="1" opacity="0.3" />
-        </svg>
+        DNA
       </motion.div>
 
-      {/* Floating hexagon — middle right */}
+      {/* Floating ∑ — middle right */}
       <motion.div
-        className="geo-shape"
-        style={{ top: '70%', right: '40%', width: '70px', height: '70px' }}
-        animate={{ rotate: -360, y: [-15, 15, -15], x: [-5, 5, -5] }}
-        transition={{ rotate: { duration: 45, repeat: Infinity, ease: 'linear' }, y: { duration: 10, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 7, repeat: Infinity, ease: 'easeInOut' } }}
+        className="geo-shape flex items-center justify-center"
+        style={{ top: '55%', right: '8%', width: '70px', height: '70px', fontSize: '2.2rem', color: 'oklch(0.72 0.19 155)' }}
+        animate={{ rotate: [0, 10, -10, 0], y: [-15, 15, -15], x: [-5, 5, -5] }}
+        transition={{ rotate: { duration: 15, repeat: Infinity, ease: 'easeInOut' }, y: { duration: 10, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 7, repeat: Infinity, ease: 'easeInOut' } }}
       >
-        <svg viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M35 5 L63 20 L63 50 L35 65 L7 50 L7 20 Z" stroke="currentColor" strokeWidth="1" opacity="0.3" />
-        </svg>
+        ∑
       </motion.div>
 
-      {/* Wireframe sphere — center */}
+      {/* Floating ∇ — center area */}
       <motion.div
-        className="geo-shape"
-        style={{ top: '20%', left: '45%', width: '100px', height: '100px' }}
-        animate={{ rotateY: 360, rotateX: [0, 15, 0, -15, 0] }}
+        className="geo-shape flex items-center justify-center"
+        style={{ top: '42%', left: '50%', width: '80px', height: '80px', fontSize: '2rem', color: 'oklch(0.72 0.19 155)' }}
+        animate={{ rotateY: [0, 360], rotateX: [0, 15, 0, -15, 0] }}
         transition={{ rotateY: { duration: 30, repeat: Infinity, ease: 'linear' }, rotateX: { duration: 15, repeat: Infinity, ease: 'easeInOut' } }}
       >
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="50" cy="50" rx="45" ry="45" stroke="currentColor" strokeWidth="0.5" opacity="0.3" />
-          <ellipse cx="50" cy="50" rx="45" ry="25" stroke="currentColor" strokeWidth="0.5" opacity="0.2" />
-          <ellipse cx="50" cy="50" rx="25" ry="45" stroke="currentColor" strokeWidth="0.5" opacity="0.2" />
-        </svg>
+        ∇
       </motion.div>
 
-      {/* Small dots grid — scattered */}
-      {[...Array(12)].map((_, i) => (
+      {/* Floating </> — bottom left */}
+      <motion.div
+        className="geo-shape flex items-center justify-center"
+        style={{ bottom: '25%', left: '12%', width: '75px', height: '45px', fontSize: '1.6rem', color: 'oklch(0.72 0.19 155)' }}
+        animate={{ y: [-8, 12, -8], rotate: [-3, 3, -3] }}
+        transition={{ y: { duration: 9, repeat: Infinity, ease: 'easeInOut' }, rotate: { duration: 11, repeat: Infinity, ease: 'easeInOut' } }}
+      >
+        &lt;/&gt;
+      </motion.div>
+
+      {/* Floating λ — middle area */}
+      <motion.div
+        className="geo-shape flex items-center justify-center"
+        style={{ top: '72%', left: '65%', width: '60px', height: '60px', fontSize: '2rem', color: 'oklch(0.72 0.19 155)' }}
+        animate={{ y: [-12, 8, -12], rotateZ: [0, 15, -15, 0] }}
+        transition={{ y: { duration: 7, repeat: Infinity, ease: 'easeInOut' }, rotateZ: { duration: 13, repeat: Infinity, ease: 'easeInOut' } }}
+      >
+        λ
+      </motion.div>
+
+      {/* Floating ∞ — upper center */}
+      <motion.div
+        className="geo-shape flex items-center justify-center"
+        style={{ top: '5%', left: '55%', width: '65px', height: '40px', fontSize: '1.8rem', color: 'oklch(0.72 0.19 155)' }}
+        animate={{ y: [-5, 10, -5], x: [-3, 3, -3] }}
+        transition={{ y: { duration: 6, repeat: Infinity, ease: 'easeInOut' }, x: { duration: 9, repeat: Infinity, ease: 'easeInOut' } }}
+      >
+        ∞
+      </motion.div>
+
+      {/* Floating ATCG — lower center right */}
+      <motion.div
+        className="geo-shape flex items-center justify-center"
+        style={{ bottom: '35%', right: '25%', width: '80px', height: '40px', fontSize: '1.1rem', color: 'oklch(0.72 0.19 155)', letterSpacing: '0.15em' }}
+        animate={{ y: [-10, 15, -10], rotate: [-2, 2, -2] }}
+        transition={{ y: { duration: 8, repeat: Infinity, ease: 'easeInOut' }, rotate: { duration: 14, repeat: Infinity, ease: 'easeInOut' } }}
+      >
+        ATCG
+      </motion.div>
+
+      {/* Small symbol dots — scattered (deterministic, no Math.random) */}
+      {mounted && DOT_CONFIGS.map((cfg, i) => (
         <motion.div
           key={i}
-          className="absolute w-1 h-1 rounded-full bg-primary"
+          className="absolute flex items-center justify-center font-mono"
           style={{
-            top: `${10 + Math.random() * 80}%`,
-            left: `${5 + Math.random() * 90}%`,
-            opacity: 0.05 + Math.random() * 0.08,
+            top: `${cfg.top}%`,
+            left: `${cfg.left}%`,
+            opacity: 0,
+            color: 'oklch(0.72 0.19 155)',
+            fontSize: '0.7rem',
           }}
-          animate={{ 
-            y: [0, -20 - Math.random() * 20, 0],
-            opacity: [0.03, 0.1, 0.03],
+          animate={{
+            y: [0, -cfg.yRange, 0],
+            opacity: [0.03, cfg.opacity, 0.03],
           }}
-          transition={{ 
-            duration: 5 + Math.random() * 8, 
-            repeat: Infinity, 
+          transition={{
+            duration: cfg.duration,
+            repeat: Infinity,
             ease: 'easeInOut',
-            delay: Math.random() * 5,
+            delay: cfg.delay,
           }}
-        />
+        >
+          {SYMBOLS[i % SYMBOLS.length].char}
+        </motion.div>
       ))}
     </div>
   )

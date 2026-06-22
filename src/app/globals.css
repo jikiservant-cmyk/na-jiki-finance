@@ -227,8 +227,10 @@
 .geo-shape {
   position: absolute;
   pointer-events: none;
-  opacity: 0.06;
-  border: 1px solid oklch(0.72 0.19 155);
+  opacity: 0.08;
+  font-weight: 300;
+  letter-spacing: 0.05em;
+  user-select: none;
 }
 
 .geo-cube {
