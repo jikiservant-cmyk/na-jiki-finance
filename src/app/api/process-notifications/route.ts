@@ -76,7 +76,7 @@ export async function POST() {
             attemptCount: newAttemptCount,
             lastAttemptAt: new Date(),
             lastResponseStatus: null,
-            processingError: error instanceof Error ? error.message : 'Unknown error',
+            lastResponseBody: error instanceof Error ? error.message : 'Unknown error',
             nextRetryAt,
           },
         })
