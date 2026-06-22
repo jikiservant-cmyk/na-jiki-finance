@@ -9,151 +9,159 @@ datasource db {
   schemas  = ["public"]
 }
 
-model applications {
+model Application {
   id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code                   String                   @unique
   name                   String
-  base_url               String
-  webhook_path           String                   @default("/api/internal/payment-completed")
-  internal_secret_ref    String
-  is_active               Boolean                  @default(true)
-  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
-  internal_notifications internal_notifications[]
-  payment_intents        payment_intents[]
-  payment_types          payment_types[]
+  baseUrl                String                   @map("base_url")
+  webhookPath            String                   @map("webhook_path") @default("/api/internal/payment-completed")
+  internalSecretRef      String                   @map("internal_secret_ref")
+  isActive               Boolean                  @map("is_active") @default(true)
+  createdAt              DateTime                 @map("created_at") @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                 @map("updated_at") @default(now()) @db.Timestamptz(6)
+  internalNotifications  InternalNotification[]
+  paymentIntents         PaymentIntent[]
+  paymentTypes           PaymentType[]
 
+  @@map("applications")
   @@schema("public")
 }
 
-model internal_notifications {
+model InternalNotification {
   id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  payment_intent_id    String              @db.Uuid
-  application_id       String              @db.Uuid
+  paymentIntentId      String              @map("payment_intent_id") @db.Uuid
+  applicationId        String              @map("application_id") @db.Uuid
   url                  String
   payload              Json
-  status               notification_status @default(pending)
-  attempt_count        Int                 @default(0)
-  max_attempts         Int                 @default(5)
-  last_attempt_at      DateTime?           @db.Timestamptz(6)
-  next_retry_at        DateTime?           @db.Timestamptz(6)
-  last_response_status Int?
-  last_response_body   String?
-  created_at           DateTime            @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime            @default(now()) @db.Timestamptz(6)
-  applications         applications        @relation(fields: [application_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  payment_intents      payment_intents     @relation(fields: [payment_intent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status               NotificationStatus @default(pending)
+  attemptCount         Int                 @map("attempt_count") @default(0)
+  maxAttempts          Int                 @map("max_attempts") @default(5)
+  lastAttemptAt        DateTime?           @map("last_attempt_at") @db.Timestamptz(6)
+  nextRetryAt          DateTime?           @map("next_retry_at") @db.Timestamptz(6)
+  lastResponseStatus   Int?                @map("last_response_status")
+  lastResponseBody     String?              @map("last_response_body")
+  createdAt            DateTime            @map("created_at") @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime            @map("updated_at") @default(now()) @db.Timestamptz(6)
+  application          Application         @relation(fields: [applicationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  paymentIntent        PaymentIntent       @relation(fields: [paymentIntentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([payment_intent_id], map: "idx_internal_notifications_intent")
+  @@index([paymentIntentId], map: "idx_internal_notifications_intent")
+  @@map("internal_notifications")
   @@schema("public")
 }
 
-model payment_intents {
+model PaymentIntent {
   id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  application_id         String                   @db.Uuid
-  tenant_id              String?                  @db.Uuid
-  payment_type_id        String?                  @db.Uuid
-  external_entity_id     String?
+  applicationId          String                   @map("application_id") @db.Uuid
+  tenantId               String?                  @map("tenant_id") @db.Uuid
+  paymentTypeId          String?                  @map("payment_type_id") @db.Uuid
+  externalEntityId       String?                  @map("external_entity_id")
   reference              String                   @unique
-  idempotency_key        String                   @unique
+  idempotencyKey         String                   @map("idempotency_key") @unique
   amount                 Decimal                  @db.Decimal(14, 2)
   currency               String                   @default("UGX")
-  phone_number           String?
-  provider_id            String                   @db.Uuid
-  provider_payment_id    String?
-  status                 payment_status           @default(pending)
+  phoneNumber            String?                  @map("phone_number")
+  providerId             String                   @map("provider_id") @db.Uuid
+  providerPaymentId      String?                  @map("provider_payment_id")
+  status                 PaymentStatus           @default(pending)
   metadata               Json                     @default("{}")
-  failure_reason         String?
-  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
-  completed_at           DateTime?                @db.Timestamptz(6)
-  internal_notifications internal_notifications[]
-  applications           applications             @relation(fields: [application_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  payment_types          payment_types?           @relation(fields: [payment_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  providers              providers                @relation(fields: [provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  tenants                tenants?                 @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  payment_transactions   payment_transactions[]
-  webhook_logs           webhook_logs[]
+  failureReason          String?                  @map("failure_reason")
+  createdAt              DateTime                 @map("created_at") @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                 @map("updated_at") @default(now()) @db.Timestamptz(6)
+  completedAt            DateTime?                @map("completed_at") @db.Timestamptz(6)
+  internalNotifications  InternalNotification[]
+  application            Application             @relation(fields: [applicationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  paymentType            PaymentType?             @relation(fields: [paymentTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  provider               Provider                @relation(fields: [providerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tenant                 Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  paymentTransactions    PaymentTransaction[]
+  webhookLogs            WebhookLog[]
 
-  @@index([application_id], map: "idx_payment_intents_application")
-  @@index([created_at], map: "idx_payment_intents_created_at")
-  @@index([provider_payment_id], map: "idx_payment_intents_provider_payment_id")
+  @@index([applicationId], map: "idx_payment_intents_application")
+  @@index([createdAt], map: "idx_payment_intents_created_at")
+  @@index([providerPaymentId], map: "idx_payment_intents_provider_payment_id")
   @@index([status], map: "idx_payment_intents_status")
-  @@index([tenant_id], map: "idx_payment_intents_tenant")
+  @@index([tenantId], map: "idx_payment_intents_tenant")
+  @@map("payment_intents")
   @@schema("public")
 }
 
-model payment_transactions {
+model PaymentTransaction {
   id                    String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  payment_intent_id     String          @db.Uuid
-  status                payment_status
-  raw_provider_response Json?
+  paymentIntentId       String          @map("payment_intent_id") @db.Uuid
+  status                PaymentStatus
+  rawProviderResponse   Json?           @map("raw_provider_response")
   note                  String?
-  created_at            DateTime        @default(now()) @db.Timestamptz(6)
-  payment_intents       payment_intents @relation(fields: [payment_intent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt             DateTime        @map("created_at") @default(now()) @db.Timestamptz(6)
+  paymentIntent         PaymentIntent   @relation(fields: [paymentIntentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([created_at], map: "idx_payment_transactions_created_at")
-  @@index([payment_intent_id], map: "idx_payment_transactions_intent")
+  @@index([createdAt], map: "idx_payment_transactions_created_at")
+  @@index([paymentIntentId], map: "idx_payment_transactions_intent")
+  @@map("payment_transactions")
   @@schema("public")
 }
 
-model payment_types {
+model PaymentType {
   id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  application_id  String            @db.Uuid
+  applicationId   String            @map("application_id") @db.Uuid
   code            String
   description     String?
-  created_at      DateTime          @default(now()) @db.Timestamptz(6)
-  payment_intents payment_intents[]
-  applications    applications      @relation(fields: [application_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt       DateTime          @map("created_at") @default(now()) @db.Timestamptz(6)
+  paymentIntents  PaymentIntent[]
+  application     Application       @relation(fields: [applicationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@unique([application_id, code])
+  @@unique([applicationId, code])
+  @@map("payment_types")
   @@schema("public")
 }
 
-model providers {
+model Provider {
   id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code            String            @unique
   name            String
-  credentials_ref String
-  is_active       Boolean           @default(true)
-  created_at      DateTime          @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
-  payment_intents payment_intents[]
-  webhook_logs    webhook_logs[]
+  credentialsRef  String            @map("credentials_ref")
+  isActive        Boolean           @map("is_active") @default(true)
+  createdAt       DateTime          @map("created_at") @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime          @map("updated_at") @default(now()) @db.Timestamptz(6)
+  paymentIntents  PaymentIntent[]
+  webhookLogs     WebhookLog[]
 
+  @@map("providers")
   @@schema("public")
 }
 
-model tenants {
-  id                  String                @id @db.Uuid
-  app_type            String
-  name                String?
-  created_at          DateTime              @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
-  payment_intents     payment_intents[]
+model Tenant {
+  id               String                @id @db.Uuid
+  appType          String                @map("app_type")
+  name             String?
+  createdAt        DateTime              @map("created_at") @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  paymentIntents   PaymentIntent[]
 
+  @@map("tenants")
   @@schema("public")
 }
 
-model webhook_logs {
+model WebhookLog {
   id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  provider_id       String           @db.Uuid
-  payment_intent_id String?          @db.Uuid
+  providerId        String           @map("provider_id") @db.Uuid
+  paymentIntentId   String?          @map("payment_intent_id") @db.Uuid
   payload           Json
   headers           Json?
-  signature_valid   Boolean
+  signatureValid    Boolean          @map("signature_valid")
   processed         Boolean          @default(false)
-  processing_error  String?
-  created_at        DateTime         @default(now()) @db.Timestamptz(6)
-  payment_intents   payment_intents? @relation(fields: [payment_intent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  providers         providers        @relation(fields: [provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  processingError   String?          @map("processing_error")
+  createdAt         DateTime         @map("created_at") @default(now()) @db.Timestamptz(6)
+  paymentIntent     PaymentIntent?   @relation(fields: [paymentIntentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  provider          Provider         @relation(fields: [providerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([created_at], map: "idx_webhook_logs_created_at")
-  @@index([payment_intent_id], map: "idx_webhook_logs_intent")
-  @@index([provider_id], map: "idx_webhook_logs_provider")
+  @@index([createdAt], map: "idx_webhook_logs_created_at")
+  @@index([paymentIntentId], map: "idx_webhook_logs_intent")
+  @@index([providerId], map: "idx_webhook_logs_provider")
+  @@map("webhook_logs")
   @@schema("public")
 }
 
-enum notification_status {
+enum NotificationStatus {
   pending
   delivered
   failed_retrying
@@ -161,7 +169,7 @@ enum notification_status {
   @@schema("public")
 }
 
-enum payment_status {
+enum PaymentStatus {
   pending
   processing
   success

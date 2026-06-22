@@ -20,8 +20,8 @@ export async function POST(
     const providerClient = getPaymentProvider(providerCode)
 
     // 3. Find provider in DB
-    const provider = await db.providers.findFirst({
-      where: { code: providerCode.toLowerCase(), is_active: true },
+    const provider = await db.provider.findFirst({
+      where: { code: providerCode.toLowerCase(), isActive: true },
     })
     if (!provider) {
       return NextResponse.json({ error: 'Provider not active' }, { status: 404 })
@@ -35,20 +35,20 @@ export async function POST(
     )
 
     // 5. Create webhook log (even if invalid signature, for auditing)
-    let webhookLog = await db.webhook_logs.create({
+    let webhookLog = await db.webhookLog.create({
       data: {
-        provider_id: provider.id,
+        providerId: provider.id,
         payload: rawBody,
         headers: Object.fromEntries(request.headers.entries()),
-        signature_valid: isValidSignature,
+        signatureValid: isValidSignature,
         processed: false,
       },
     })
 
     if (!isValidSignature) {
-      await db.webhook_logs.update({
+      await db.webhookLog.update({
         where: { id: webhookLog.id },
-        data: { processing_error: 'Invalid signature', processed: true },
+        data: { processingError: 'Invalid signature', processed: true },
       })
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
@@ -58,15 +58,15 @@ export async function POST(
     const parsedWebhook = await providerClient.parseWebhookPayload(body)
 
     // 7. Find payment intent
-    const paymentIntent = await db.payment_intents.findFirst({
+    const paymentIntent = await db.paymentIntent.findFirst({
       where: { reference: parsedWebhook.reference },
-      include: { applications: true },
+      include: { application: true },
     })
 
     if (!paymentIntent) {
-      await db.webhook_logs.update({
+      await db.webhookLog.update({
         where: { id: webhookLog.id },
-        data: { processing_error: 'Payment not found', processed: true },
+        data: { processingError: 'Payment not found', processed: true },
       })
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
     }
@@ -78,33 +78,33 @@ export async function POST(
       const updateData: any = {
         status: normalizedStatus,
       }
-      if (parsedWebhook.providerPaymentId) updateData.provider_payment_id = parsedWebhook.providerPaymentId
-      if (parsedWebhook.failureReason) updateData.failure_reason = parsedWebhook.failureReason
+      if (parsedWebhook.providerPaymentId) updateData.providerPaymentId = parsedWebhook.providerPaymentId
+      if (parsedWebhook.failureReason) updateData.failureReason = parsedWebhook.failureReason
       if (normalizedStatus === 'success' || normalizedStatus === 'failed') {
-        updateData.completed_at = new Date()
+        updateData.completedAt = new Date()
       }
-      await tx.payment_intents.update({
+      await tx.paymentIntent.update({
         where: { id: paymentIntent.id },
         data: updateData,
       })
 
       // Create transaction log
-      await tx.payment_transactions.create({
+      await tx.paymentTransaction.create({
         data: {
-          payment_intent_id: paymentIntent.id,
+          paymentIntentId: paymentIntent.id,
           status: normalizedStatus,
-          raw_provider_response: rawBody,
+          rawProviderResponse: rawBody,
           note: 'WEBHOOK_UPDATE',
         },
       })
 
       // Create internal notification
       if (normalizedStatus === 'success' || normalizedStatus === 'failed') {
-        await tx.internal_notifications.create({
+        await tx.internalNotification.create({
           data: {
-            payment_intent_id: paymentIntent.id,
-            application_id: paymentIntent.application_id,
-            url: `${paymentIntent.applications.base_url}${paymentIntent.applications.webhook_path}`,
+            paymentIntentId: paymentIntent.id,
+            applicationId: paymentIntent.applicationId,
+            url: `${paymentIntent.application.baseUrl}${paymentIntent.application.webhookPath}`,
             payload: {
               paymentIntentId: paymentIntent.id,
               reference: paymentIntent.reference,
@@ -115,18 +115,18 @@ export async function POST(
               failureReason: parsedWebhook.failureReason,
             },
             status: 'pending',
-            attempt_count: 0,
-            max_attempts: 5,
-            next_retry_at: new Date(),
+            attemptCount: 0,
+            maxAttempts: 5,
+            nextRetryAt: new Date(),
           },
         })
       }
     })
 
     // 9. Update webhook log
-    await db.webhook_logs.update({
+    await db.webhookLog.update({
       where: { id: webhookLog.id },
-      data: { payment_intent_id: paymentIntent.id, processed: true },
+      data: { paymentIntentId: paymentIntent.id, processed: true },
     })
 
     return NextResponse.json({ success: true })

@@ -10,20 +10,20 @@ export async function POST(request: Request) {
     const validatedBody = CreatePaymentRequestSchema.parse(rawBody)
 
     // 2. Find application by code
-    const application = await db.applications.findFirst({
-      where: { code: validatedBody.applicationCode, is_active: true },
+    const application = await db.application.findFirst({
+      where: { code: validatedBody.applicationCode, isActive: true },
     })
     if (!application) {
       return NextResponse.json({ error: 'Invalid or inactive application' }, { status: 404 })
     }
 
     // 3. Find tenant (optional) - using tenantCode as the UUID id
-    let tenant: Awaited<ReturnType<typeof db.tenants.findFirst>> = null
+    let tenant: Awaited<ReturnType<typeof db.tenant.findFirst>> = null
     if (validatedBody.tenantCode) {
-      tenant = await db.tenants.findFirst({
+      tenant = await db.tenant.findFirst({
         where: { 
           id: validatedBody.tenantCode, // tenantCode is the UUID
-          app_type: validatedBody.applicationCode // app_type should match application code
+          appType: validatedBody.applicationCode // appType should match application code
         },
       })
       if (!tenant) {
@@ -32,25 +32,25 @@ export async function POST(request: Request) {
     }
 
     // 4. Find payment type (optional)
-    let paymentType: Awaited<ReturnType<typeof db.payment_types.findFirst>> = null
+    let paymentType: Awaited<ReturnType<typeof db.paymentType.findFirst>> = null
     if (validatedBody.paymentTypeCode) {
-      paymentType = await db.payment_types.findFirst({
-        where: { application_id: application.id, code: validatedBody.paymentTypeCode },
+      paymentType = await db.paymentType.findFirst({
+        where: { applicationId: application.id, code: validatedBody.paymentTypeCode },
       })
     }
 
     // 5. Find first active provider
-    let provider: Awaited<ReturnType<typeof db.providers.findFirst>> = null
-    provider = await db.providers.findFirst({
-      where: { is_active: true },
+    let provider: Awaited<ReturnType<typeof db.provider.findFirst>> = null
+    provider = await db.provider.findFirst({
+      where: { isActive: true },
     })
     if (!provider) {
       return NextResponse.json({ error: 'No active payment provider available' }, { status: 500 })
     }
 
     // 6. Check idempotency key to prevent duplicate payments
-    const existingIntent = await db.payment_intents.findFirst({
-      where: { idempotency_key: validatedBody.idempotencyKey },
+    const existingIntent = await db.paymentIntent.findFirst({
+      where: { idempotencyKey: validatedBody.idempotencyKey },
     })
     if (existingIntent) {
       return NextResponse.json({
@@ -64,25 +64,25 @@ export async function POST(request: Request) {
     const reference = `${validatedBody.applicationCode.toUpperCase()}-${(validatedBody.paymentTypeCode || 'PAY').toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`
 
     // 8. Create payment intent in DB
-    const paymentIntent = await db.payment_intents.create({
+    const paymentIntent = await db.paymentIntent.create({
       data: {
-        application_id: application.id,
-        tenant_id: tenant?.id || null,
-        payment_type_id: paymentType?.id || null,
-        external_entity_id: validatedBody.externalEntityId,
+        applicationId: application.id,
+        tenantId: tenant?.id || null,
+        paymentTypeId: paymentType?.id || null,
+        externalEntityId: validatedBody.externalEntityId,
         reference,
-        idempotency_key: validatedBody.idempotencyKey,
+        idempotencyKey: validatedBody.idempotencyKey,
         amount: validatedBody.amount,
         currency: validatedBody.currency,
-        phone_number: validatedBody.phoneNumber,
-        provider_id: provider.id,
+        phoneNumber: validatedBody.phoneNumber,
+        providerId: provider.id,
         status: 'pending',
         metadata: validatedBody.metadata || {},
       },
       include: {
-        applications: true,
-        tenants: true,
-        providers: true,
+        application: true,
+        tenant: true,
+        provider: true,
       },
     })
 
@@ -98,22 +98,22 @@ export async function POST(request: Request) {
     })
 
     // 10. Update payment intent with provider response
-    const updatedIntent = await db.payment_intents.update({
+    const updatedIntent = await db.paymentIntent.update({
       where: { id: paymentIntent.id },
       data: {
         status: providerResponse.status,
-        provider_payment_id: providerResponse.providerPaymentId,
-        failure_reason: providerResponse.failureReason,
-        completed_at: providerResponse.status === 'success' ? new Date() : null,
+        providerPaymentId: providerResponse.providerPaymentId,
+        failureReason: providerResponse.failureReason,
+        completedAt: providerResponse.status === 'success' ? new Date() : null,
       },
     })
 
     // 11. Create transaction log
-    await db.payment_transactions.create({
+    await db.paymentTransaction.create({
       data: {
-        payment_intent_id: paymentIntent.id,
+        paymentIntentId: paymentIntent.id,
         status: providerResponse.status,
-        raw_provider_response: providerResponse,
+        rawProviderResponse: providerResponse,
         note: 'PAYMENT_INITIATED',
       },
     })
