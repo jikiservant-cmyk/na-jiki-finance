@@ -48,21 +48,22 @@ async function seed() {
   })
 
   // === PAYMENT TYPES ===
-  const saccoDeposit  = await db.paymentType.create({ data: { applicationId: sacco.id,  code: 'deposit',        description: 'Member savings deposit' } })
-  const saccoLoan     = await db.paymentType.create({ data: { applicationId: sacco.id,  code: 'loan_repayment', description: 'Loan repayment' } })
-  const churchTithe   = await db.paymentType.create({ data: { applicationId: church.id, code: 'tithe',          description: 'Tithe payment' } })
-  const churchOffering = await db.paymentType.create({ data: { applicationId: church.id, code: 'offering',       description: 'General offering' } })
-  const schoolTuition = await db.paymentType.create({ data: { applicationId: school.id, code: 'tuition',        description: 'Tuition fee' } })
-  const schoolSub     = await db.paymentType.create({ data: { applicationId: school.id, code: 'subscription',   description: 'Platform subscription' } })
+  const saccoDeposit = await db.paymentType.create({ data: { applicationId: sacco.id, code: 'deposit', description: 'Member savings deposit' } })
+  const saccoLoan = await db.paymentType.create({ data: { applicationId: sacco.id, code: 'loan_repayment', description: 'Loan repayment' } })
+  const saccoActivation = await db.paymentType.create({ data: { applicationId: sacco.id, code: 'account_activation', description: 'Account activation fee' } })
+  const churchTithe = await db.paymentType.create({ data: { applicationId: church.id, code: 'tithe', description: 'Tithe payment' } })
+  const churchOffering = await db.paymentType.create({ data: { applicationId: church.id, code: 'offering', description: 'General offering' } })
+  const schoolTuition = await db.paymentType.create({ data: { applicationId: school.id, code: 'tuition', description: 'Tuition fee' } })
+  const schoolSub = await db.paymentType.create({ data: { applicationId: school.id, code: 'subscription', description: 'Platform subscription' } })
 
   // === PAYMENT INTENTS (last 14 days) ===
   const providers = [livepay, mtn, airtel, pesapal]
   const statusWeights = ['pending', 'pending', 'processing', 'success', 'success', 'success', 'success', 'success', 'failed', 'expired']
 
   const appConfig = [
-    { app: sacco,  types: [saccoDeposit, saccoLoan],       tenantPool: [abcSacco, xyzSacco], prefix: 'SACCO'  },
-    { app: church, types: [churchTithe, churchOffering],   tenantPool: [graceChurch],        prefix: 'CHURCH' },
-    { app: school, types: [schoolTuition, schoolSub],      tenantPool: [hopeAcademy],        prefix: 'SCHOOL' },
+    { app: sacco, types: [saccoDeposit, saccoLoan, saccoActivation], tenantPool: [abcSacco, xyzSacco], prefix: 'SACCO' },
+    { app: church, types: [churchTithe, churchOffering], tenantPool: [graceChurch], prefix: 'CHURCH' },
+    { app: school, types: [schoolTuition, schoolSub], tenantPool: [hopeAcademy], prefix: 'SCHOOL' },
   ]
 
   let counter = 1000
