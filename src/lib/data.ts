@@ -7,72 +7,127 @@ import { db } from './db'
 // ===== DASHBOARD AGGREGATE DATA =====
 
 export async function getDashboardData() {
-  // Get all payment intents with relations
-  const intents = await db.paymentIntent.findMany({
-    include: {
-      application: true,
-      tenant: true,
-      provider: true,
-      paymentType: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  })
+  // 1. Get total counts and revenue (fast, uses SQL aggregates)
+  const [
+    totalPayments,
+    totalRevenueData,
+    statusCountData,
+    appRevenueData,
+    providerRevenueData,
+    recentIntents,
+    notificationsData
+  ] = await Promise.all([
+    db.paymentIntent.count(),
+    db.paymentIntent.aggregate({
+      where: { status: 'success' },
+      _sum: { amount: true }
+    }),
+    db.paymentIntent.groupBy({
+      by: ['status'],
+      _count: true
+    }),
+    db.paymentIntent.groupBy({
+      by: ['applicationId'],
+      where: { status: 'success' },
+      _sum: { amount: true },
+      _count: true
+    }),
+    db.paymentIntent.groupBy({
+      by: ['providerId'],
+      where: { status: 'success' },
+      _sum: { amount: true },
+      _count: true
+    }),
+    db.paymentIntent.findMany({
+      include: {
+        application: true,
+        tenant: true,
+        provider: true,
+        paymentType: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30
+    }),
+    db.internalNotification.groupBy({
+      by: ['status'],
+      _count: true
+    })
+  ])
 
-  const totalRevenue = intents
-    .filter(i => i.status === 'success')
-    .reduce((sum, i) => sum + i.amount, 0)
+  const totalRevenue = totalRevenueData._sum.amount || 0
 
-  const statusCounts = {
-    success: intents.filter(i => i.status === 'success').length,
-    pending: intents.filter(i => i.status === 'pending').length,
-    processing: intents.filter(i => i.status === 'processing').length,
-    failed: intents.filter(i => i.status === 'failed').length,
-    expired: intents.filter(i => i.status === 'expired').length,
-    cancelled: intents.filter(i => i.status === 'cancelled').length,
+  // 2. Format status counts
+  const statusCounts: Record<string, number> = {
+    success: 0,
+    pending: 0,
+    processing: 0,
+    failed: 0,
+    expired: 0,
+    cancelled: 0,
+  }
+  for (const item of statusCountData) {
+    statusCounts[item.status] = item._count
   }
 
-  const successRate = intents.length > 0
-    ? ((statusCounts.success / intents.length) * 100).toFixed(1)
+  const successRate = totalPayments > 0
+    ? ((statusCounts.success / totalPayments) * 100).toFixed(1)
     : '0'
 
-  // Revenue by application
-  const appRevenue: Record<string, { code: string; name: string; revenue: number; count: number; successCount: number }> = {}
-  for (const i of intents.filter(i => i.status === 'success')) {
-    const key = i.application.code
-    if (!appRevenue[key]) {
-      appRevenue[key] = { code: key, name: i.application.name, revenue: 0, count: 0, successCount: 0 }
-    }
-    appRevenue[key].revenue += i.amount
-    appRevenue[key].successCount += 1
-  }
-  for (const i of intents) {
-    const key = i.application.code
-    if (appRevenue[key]) appRevenue[key].count += 1
-  }
+  // 3. Revenue by application (fetch app details)
+  const appIds = appRevenueData.map(i => i.applicationId)
+  const apps = await db.application.findMany({
+    where: { id: { in: appIds } }
+  })
+  const appMap = new Map(apps.map(a => [a.id, a]))
 
-  // Revenue by provider
-  const providerRevenue: Record<string, { code: string; name: string; revenue: number; count: number }> = {}
-  for (const i of intents.filter(i => i.status === 'success')) {
-    const key = i.provider.code
-    if (!providerRevenue[key]) {
-      providerRevenue[key] = { code: key, name: i.provider.name, revenue: 0, count: 0 }
-    }
-    providerRevenue[key].revenue += i.amount
-    providerRevenue[key].count += 1
-  }
+  const appRevenue = appRevenueData.map(i => ({
+    code: appMap.get(i.applicationId)?.code || 'unknown',
+    name: appMap.get(i.applicationId)?.name || 'Unknown',
+    revenue: i._sum.amount || 0,
+    count: i._count,
+    successCount: i._count
+  }))
 
-  // Revenue by tenant
-  const tenantRevenue: Record<string, { code: string; name: string; application: string; revenue: number; count: number }> = {}
-  for (const i of intents.filter(i => i.status === 'success' && i.tenant)) {
-    const key = i.tenant!.code
-    if (!tenantRevenue[key]) {
-      tenantRevenue[key] = { code: key, name: i.tenant!.name, application: i.application.code, revenue: 0, count: 0 }
-    }
-    tenantRevenue[key].revenue += i.amount
-    tenantRevenue[key].count += 1
-  }
+  // 4. Revenue by provider (fetch provider details)
+  const providerIds = providerRevenueData.map(i => i.providerId)
+  const providers = await db.provider.findMany({
+    where: { id: { in: providerIds } }
+  })
+  const providerMap = new Map(providers.map(p => [p.id, p]))
 
-  // Daily revenue (14 days)
+  const providerRevenue = providerRevenueData.map(i => ({
+    code: providerMap.get(i.providerId)?.code || 'unknown',
+    name: providerMap.get(i.providerId)?.name || 'Unknown',
+    revenue: i._sum.amount || 0,
+    count: i._count
+  }))
+
+  // 5. Revenue by tenant (we'll do this with a groupBy including tenant)
+  const tenantRevenueData = await db.paymentIntent.groupBy({
+    by: ['tenantId', 'applicationId'],
+    where: { status: 'success', tenantId: { not: null } },
+    _sum: { amount: true },
+    _count: true
+  })
+  const tenantIds = tenantRevenueData.map(i => i.tenantId!).filter(Boolean)
+  const tenants = await db.tenant.findMany({
+    where: { id: { in: tenantIds } },
+    include: { application: true }
+  })
+  const tenantMap = new Map(tenants.map(t => [t.id, t]))
+
+  const tenantRevenue = tenantRevenueData.map(i => {
+    const tenant = tenantMap.get(i.tenantId!)
+    return {
+      code: tenant?.code || 'unknown',
+      name: tenant?.name || 'Unknown',
+      application: tenant?.application.code || 'unknown',
+      revenue: i._sum.amount || 0,
+      count: i._count
+    }
+  })
+
+  // 6. Daily revenue (14 days)
   const dailyRevenue: { date: string; revenue: number; count: number; failed: number }[] = []
   for (let d = 13; d >= 0; d--) {
     const date = new Date()
@@ -81,34 +136,63 @@ export async function getDashboardData() {
     const dayStart = new Date(dateStr + 'T00:00:00')
     const dayEnd = new Date(dateStr + 'T23:59:59')
 
-    const daySuccess = intents.filter(i => i.status === 'success' && i.completedAt && i.completedAt >= dayStart && i.completedAt <= dayEnd)
-    const dayFailed = intents.filter(i => i.status === 'failed' && i.createdAt >= dayStart && i.createdAt <= dayEnd)
+    const [daySuccess, dayFailed] = await Promise.all([
+      db.paymentIntent.aggregate({
+        where: {
+          status: 'success',
+          completedAt: { gte: dayStart, lte: dayEnd }
+        },
+        _sum: { amount: true },
+        _count: true
+      }),
+      db.paymentIntent.count({
+        where: {
+          status: 'failed',
+          createdAt: { gte: dayStart, lte: dayEnd }
+        }
+      })
+    ])
 
     dailyRevenue.push({
       date: dateStr,
-      revenue: daySuccess.reduce((s, i) => s + i.amount, 0),
-      count: daySuccess.length,
-      failed: dayFailed.length,
+      revenue: daySuccess._sum.amount || 0,
+      count: daySuccess._count,
+      failed: dayFailed
     })
   }
 
-  // Payment funnel (by application)
+  // 7. Payment funnel
+  const appFunnelData = await db.paymentIntent.groupBy({
+    by: ['applicationId', 'status'],
+    _count: true
+  })
   const funnel: Record<string, { application: string; total: number; success: number; failed: number; inFlight: number; rate: string }> = {}
-  for (const i of intents) {
-    const key = i.application.code
-    if (!funnel[key]) funnel[key] = { application: i.application.name, total: 0, success: 0, failed: 0, inFlight: 0, rate: '0' }
-    funnel[key].total += 1
-    if (i.status === 'success') funnel[key].success += 1
-    if (i.status === 'failed') funnel[key].failed += 1
-    if (i.status === 'pending' || i.status === 'processing') funnel[key].inFlight += 1
+  for (const item of appFunnelData) {
+    const app = appMap.get(item.applicationId)
+    if (!app) continue
+    const key = app.code
+    if (!funnel[key]) {
+      funnel[key] = {
+        application: app.name,
+        total: 0,
+        success: 0,
+        failed: 0,
+        inFlight: 0,
+        rate: '0'
+      }
+    }
+    funnel[key].total += item._count
+    if (item.status === 'success') funnel[key].success += item._count
+    if (item.status === 'failed') funnel[key].failed += item._count
+    if (item.status === 'pending' || item.status === 'processing') funnel[key].inFlight += item._count
   }
   for (const key of Object.keys(funnel)) {
     const f = funnel[key]
     f.rate = f.total > 0 ? ((f.success / f.total) * 100).toFixed(1) : '0'
   }
 
-  // Recent intents for table
-  const recentIntents = intents.slice(0, 30).map(i => ({
+  // 8. Recent intents format
+  const recentIntentsFormatted = recentIntents.map(i => ({
     id: i.id,
     reference: i.reference,
     application: i.application.name,
@@ -128,27 +212,33 @@ export async function getDashboardData() {
     completedAt: i.completedAt,
   }))
 
-  // Notification stats
-  const notifications = await db.internalNotification.findMany()
+  // 9. Notification stats
   const notifStats = {
-    total: notifications.length,
-    delivered: notifications.filter(n => n.status === 'delivered').length,
-    pending: notifications.filter(n => n.status === 'pending').length,
-    retrying: notifications.filter(n => n.status === 'failed_retrying').length,
-    exhausted: notifications.filter(n => n.status === 'failed_exhausted').length,
+    total: 0,
+    delivered: 0,
+    pending: 0,
+    retrying: 0,
+    exhausted: 0,
+  }
+  for (const item of notificationsData) {
+    notifStats.total += item._count
+    if (item.status === 'delivered') notifStats.delivered = item._count
+    if (item.status === 'pending') notifStats.pending = item._count
+    if (item.status === 'failed_retrying') notifStats.retrying = item._count
+    if (item.status === 'failed_exhausted') notifStats.exhausted = item._count
   }
 
   return {
     totalRevenue,
     statusCounts,
     successRate,
-    appRevenue: Object.values(appRevenue),
-    providerRevenue: Object.values(providerRevenue),
-    tenantRevenue: Object.values(tenantRevenue),
+    appRevenue,
+    providerRevenue,
+    tenantRevenue,
     dailyRevenue,
     funnel: Object.values(funnel),
-    recentIntents,
-    totalPayments: intents.length,
+    recentIntents: recentIntentsFormatted,
+    totalPayments,
     notifStats,
   }
 }
@@ -196,6 +286,18 @@ export async function getPendingNotifications() {
 }
 
 // ===== PAYMENT HELPERS (for webhook processing) =====
+
+export async function getPaymentByReference(reference: string) {
+  return db.paymentIntent.findFirst({
+    where: { reference },
+    include: {
+      application: true,
+      tenant: true,
+      provider: true,
+      paymentType: true,
+    },
+  })
+}
 
 export async function getPaymentsWithApps() {
   return db.paymentIntent.findMany({

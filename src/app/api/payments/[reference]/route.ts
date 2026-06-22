@@ -3,10 +3,10 @@ import { db } from '@/lib/db'
 
 export async function GET(
   request: Request,
-  { params }: { params: { reference: string } }
+  { params }: { params: Promise<{ reference: string }> }
 ) {
   try {
-    const { reference } = params
+    const { reference } = await params
 
     const paymentIntent = await db.paymentIntent.findFirst({
       where: { reference },

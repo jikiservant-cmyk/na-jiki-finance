@@ -99,7 +99,7 @@ model PaymentIntent {
   reference         String   @unique             // human-readable: SACCO-DEP-000123
   idempotencyKey    String   @unique             // prevents duplicate intent creation
 
-  amount            Float    // using Float for SQLite compat; production uses numeric(14,2)
+  amount            Decimal  //  @db.Decimal(14,2) // Numeric(14,2) for financial precision!
   currency          String   @default("UGX")
   phoneNumber       String?
 
