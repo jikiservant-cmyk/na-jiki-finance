@@ -1,5 +1,11 @@
+// scripts/seed.ts
+// FIX: Removed `import type { PaymentStatus } from '@prisma/client'`
+// PaymentStatus was a Prisma enum in the old schema. It was replaced with
+// a plain String field when we migrated to Postgres. The type no longer
+// exists in the generated client, so the import is a dead type error.
+// All status values below are already plain string literals — no change needed there.
+
 import { db } from '../src/lib/db'
-import type { PaymentStatus } from '@prisma/client'
 
 async function seed() {
   // === PROVIDERS ===
@@ -29,35 +35,34 @@ async function seed() {
 
   // === TENANTS ===
   const abcSacco = await db.tenant.create({
-    data: { applicationId: sacco.id, code: 'abc-sacco', appType: sacco.code, name: 'ABC SACCO', defaultProviderId: livepay.id, isActive: true },
+    data: { applicationId: sacco.id, code: 'abc-sacco', name: 'ABC SACCO', defaultProviderId: livepay.id, isActive: true },
   })
   const xyzSacco = await db.tenant.create({
-    data: { applicationId: sacco.id, code: 'xyz-sacco', appType: sacco.code, name: 'XYZ SACCO', defaultProviderId: mtn.id, isActive: true },
+    data: { applicationId: sacco.id, code: 'xyz-sacco', name: 'XYZ SACCO', defaultProviderId: mtn.id, isActive: true },
   })
   const graceChurch = await db.tenant.create({
-    data: { applicationId: church.id, code: 'grace-church', appType: church.code, name: 'Grace Community Church', defaultProviderId: livepay.id, isActive: true },
+    data: { applicationId: church.id, code: 'grace-church', name: 'Grace Community Church', defaultProviderId: livepay.id, isActive: true },
   })
   const hopeAcademy = await db.tenant.create({
-    data: { applicationId: school.id, code: 'hope-academy', appType: school.code, name: 'Hope Academy', defaultProviderId: pesapal.id, isActive: true },
+    data: { applicationId: school.id, code: 'hope-academy', name: 'Hope Academy', defaultProviderId: pesapal.id, isActive: true },
   })
 
   // === PAYMENT TYPES ===
-  const saccoDeposit = await db.paymentType.create({ data: { applicationId: sacco.id, code: 'deposit', description: 'Member savings deposit' } })
-  const saccoLoan = await db.paymentType.create({ data: { applicationId: sacco.id, code: 'loan_repayment', description: 'Loan repayment' } })
-  const churchTithe = await db.paymentType.create({ data: { applicationId: church.id, code: 'tithe', description: 'Tithe payment' } })
-  const churchOffering = await db.paymentType.create({ data: { applicationId: church.id, code: 'offering', description: 'General offering' } })
-  const schoolTuition = await db.paymentType.create({ data: { applicationId: school.id, code: 'tuition', description: 'Tuition fee' } })
-  const schoolSub = await db.paymentType.create({ data: { applicationId: school.id, code: 'subscription', description: 'Platform subscription' } })
+  const saccoDeposit  = await db.paymentType.create({ data: { applicationId: sacco.id,  code: 'deposit',        description: 'Member savings deposit' } })
+  const saccoLoan     = await db.paymentType.create({ data: { applicationId: sacco.id,  code: 'loan_repayment', description: 'Loan repayment' } })
+  const churchTithe   = await db.paymentType.create({ data: { applicationId: church.id, code: 'tithe',          description: 'Tithe payment' } })
+  const churchOffering = await db.paymentType.create({ data: { applicationId: church.id, code: 'offering',       description: 'General offering' } })
+  const schoolTuition = await db.paymentType.create({ data: { applicationId: school.id, code: 'tuition',        description: 'Tuition fee' } })
+  const schoolSub     = await db.paymentType.create({ data: { applicationId: school.id, code: 'subscription',   description: 'Platform subscription' } })
 
   // === PAYMENT INTENTS (last 14 days) ===
   const providers = [livepay, mtn, airtel, pesapal]
-  const tenants = [abcSacco, xyzSacco, graceChurch, hopeAcademy]
-  const statusWeights: PaymentStatus[] = ['pending', 'pending', 'processing', 'success', 'success', 'success', 'success', 'success', 'failed', 'expired']
+  const statusWeights = ['pending', 'pending', 'processing', 'success', 'success', 'success', 'success', 'success', 'failed', 'expired']
 
   const appConfig = [
-    { app: sacco, types: [saccoDeposit, saccoLoan], tenantPool: [abcSacco, xyzSacco], prefix: 'SACCO' },
-    { app: church, types: [churchTithe, churchOffering], tenantPool: [graceChurch], prefix: 'CHURCH' },
-    { app: school, types: [schoolTuition, schoolSub], tenantPool: [hopeAcademy], prefix: 'SCHOOL' },
+    { app: sacco,  types: [saccoDeposit, saccoLoan],       tenantPool: [abcSacco, xyzSacco], prefix: 'SACCO'  },
+    { app: church, types: [churchTithe, churchOffering],   tenantPool: [graceChurch],        prefix: 'CHURCH' },
+    { app: school, types: [schoolTuition, schoolSub],      tenantPool: [hopeAcademy],        prefix: 'SCHOOL' },
   ]
 
   let counter = 1000
@@ -67,55 +72,54 @@ async function seed() {
       const numPayments = Math.floor(Math.random() * 5) + 2
 
       for (let i = 0; i < numPayments; i++) {
-        const type = config.types[Math.floor(Math.random() * config.types.length)]
-        const tenant = config.tenantPool[Math.floor(Math.random() * config.tenantPool.length)]
+        const type     = config.types[Math.floor(Math.random() * config.types.length)]
+        const tenant   = config.tenantPool[Math.floor(Math.random() * config.tenantPool.length)]
         const provider = providers[Math.floor(Math.random() * providers.length)]
-        const status = statusWeights[Math.floor(Math.random() * statusWeights.length)]
-        const amount = Math.floor(Math.random() * 500000) + 10000
+        const status   = statusWeights[Math.floor(Math.random() * statusWeights.length)]
+        const amount   = Math.floor(Math.random() * 500000) + 10000
         const createdAt = new Date()
         createdAt.setDate(createdAt.getDate() - day)
         createdAt.setHours(Math.floor(Math.random() * 12) + 8, Math.floor(Math.random() * 60))
         counter++
 
-        const reference = `${config.prefix}-${type.code.toUpperCase().replace(/_/g, '-')}-${String(counter).padStart(6, '0')}`
+        const reference      = `${config.prefix}-${type.code.toUpperCase().replace(/_/g, '-')}-${String(counter).padStart(6, '0')}`
         const idempotencyKey = `${reference}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
 
         const intent = await db.paymentIntent.create({
           data: {
-            applicationId: config.app.id,
-            tenantId: tenant.id,
-            paymentTypeId: type.id,
+            applicationId:    config.app.id,
+            tenantId:         tenant.id,
+            paymentTypeId:    type.id,
             externalEntityId: `member-${Math.floor(Math.random() * 200) + 1}`,
             reference,
             idempotencyKey,
             amount,
-            currency: 'UGX',
-            phoneNumber: `2567${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
-            providerId: provider.id,
+            currency:         'UGX',
+            phoneNumber:      `2567${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
+            providerId:       provider.id,
             providerPaymentId: status !== 'pending' ? `prov-${Math.random().toString(36).substring(2, 12)}` : null,
             status,
-            metadata: JSON.stringify({ source: config.app.code, tenant: tenant.code }),
-            failureReason: status === 'failed' ? 'INSUFFICIENT_FUNDS' : null,
-            completedAt: status === 'success' ? new Date(createdAt.getTime() + 30000 + Math.random() * 60000) : null,
+            metadata:         JSON.stringify({ source: config.app.code, tenant: tenant.code }),
+            failureReason:    status === 'failed' ? 'INSUFFICIENT_FUNDS' : null,
+            completedAt:      status === 'success' ? new Date(createdAt.getTime() + 30000 + Math.random() * 60000) : null,
             createdAt,
           },
         })
 
-        // Create internal notification for successful payments
         if (status === 'success') {
           const notifStatus = Math.random() > 0.15 ? 'delivered' : (Math.random() > 0.5 ? 'failed_retrying' : 'pending')
           await db.internalNotification.create({
             data: {
-              paymentIntentId: intent.id,
-              applicationId: config.app.id,
-              url: `${config.app.baseUrl}${config.app.webhookPath}`,
-              payload: JSON.stringify({ reference, amount, status: 'success', currency: 'UGX', paymentType: type.code, tenantId: tenant.code }),
-              status: notifStatus,
-              attemptCount: notifStatus === 'delivered' ? 1 : notifStatus === 'failed_retrying' ? Math.floor(Math.random() * 3) + 1 : 0,
+              paymentIntentId:    intent.id,
+              applicationId:      config.app.id,
+              url:                `${config.app.baseUrl}${config.app.webhookPath}`,
+              payload:            JSON.stringify({ reference, amount, status: 'success', currency: 'UGX', paymentType: type.code, tenantId: tenant.code }),
+              status:             notifStatus,
+              attemptCount:       notifStatus === 'delivered' ? 1 : notifStatus === 'failed_retrying' ? Math.floor(Math.random() * 3) + 1 : 0,
               lastResponseStatus: notifStatus === 'delivered' ? 200 : notifStatus === 'failed_retrying' ? 503 : null,
-              lastAttemptAt: notifStatus !== 'pending' ? new Date(createdAt.getTime() + 35000) : null,
-              nextRetryAt: notifStatus === 'failed_retrying' ? new Date(createdAt.getTime() + 300000) : null,
-              createdAt: new Date(createdAt.getTime() + 30000),
+              lastAttemptAt:      notifStatus !== 'pending' ? new Date(createdAt.getTime() + 35000) : null,
+              nextRetryAt:        notifStatus === 'failed_retrying' ? new Date(createdAt.getTime() + 300000) : null,
+              createdAt:          new Date(createdAt.getTime() + 30000),
             },
           })
         }
@@ -128,23 +132,22 @@ async function seed() {
   for (const intent of recentIntents) {
     await db.webhookLog.create({
       data: {
-        providerId: intent.providerId,
+        providerId:      intent.providerId,
         paymentIntentId: intent.id,
-        payload: JSON.stringify({ event: 'payment.completed', reference: intent.reference, amount: intent.amount, status: intent.status }),
-        headers: JSON.stringify({ 'x-signature': `sig-${Math.random().toString(36).substring(2, 16)}` }),
-        signatureValid: Math.random() > 0.1,
-        processed: true,
-        createdAt: new Date(intent.createdAt.getTime() + 25000),
+        payload:         JSON.stringify({ event: 'payment.completed', reference: intent.reference, amount: intent.amount, status: intent.status }),
+        headers:         JSON.stringify({ 'x-signature': `sig-${Math.random().toString(36).substring(2, 16)}` }),
+        signatureValid:  Math.random() > 0.1,
+        processed:       true,
+        createdAt:       new Date(intent.createdAt.getTime() + 25000),
       },
     })
   }
 
-  // A few invalid webhooks
   await db.webhookLog.create({
     data: { providerId: livepay.id, payload: JSON.stringify({ invalid: true }), headers: '{}', signatureValid: false, processed: false, processingError: 'Invalid signature' },
   })
 
-  console.log('Seed completed successfully!')
+  console.log('✅ Seed completed successfully!')
   await db.$disconnect()
 }
 
