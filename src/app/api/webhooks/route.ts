@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getWebhookLogs } from '@/lib/data'
+import { getWebhookLogsData } from '@/lib/data'
 
 export async function GET() {
   try {
-    const logs = await getWebhookLogs(50)
+    const logs = await getWebhookLogsData(50)
     return NextResponse.json(logs)
   } catch (error) {
     console.error('Webhooks API error:', error)

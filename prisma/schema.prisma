@@ -7,60 +7,190 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// === APPLICATIONS ===
+// The apps allowed to use this payment service (sacco, church, school, ...)
+
 model Application {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  displayName String
-  webhookUrl  String?
-  apiKey      String?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  payments    Payment[]
+  id                String   @id @default(cuid())
+  code              String   @unique             // 'sacco', 'church'
+  name              String                       // 'SACCO Platform'
+  baseUrl           String                       // 'https://sacco.yourdomain.com'
+  webhookPath       String   @default("/api/internal/payment-completed")
+  internalSecretRef String                       // env var / vault key name — NEVER the secret itself
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenants           Tenant[]
+  paymentTypes      PaymentType[]
+  paymentIntents    PaymentIntent[]
+  internalNotifications InternalNotification[]
 }
 
-model Payment {
-  id                String            @id @default(cuid())
-  reference         String            @unique
-  applicationId     String
-  application       Application       @relation(fields: [applicationId], references: [id])
-  tenantId          String?
-  customerId        String?
-  paymentType       String
-  amount            Float
-  currency          String            @default("UGX")
-  status            String            @default("PENDING")
-  provider          String?
-  providerReference String?
-  providerResponse  String?
-  completedAt       DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  webhookLogs       WebhookLog[]
-  transactions      PaymentTransaction[]
+// === PROVIDERS ===
+// The payment gateways this service talks to (livepay, relworx, ...)
+
+model Provider {
+  id              String   @id @default(cuid())
+  code            String   @unique              // 'livepay', 'relworx'
+  name            String
+  credentialsRef  String                        // env var / vault key prefix
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenants         Tenant[]
+  paymentIntents  PaymentIntent[]
+  webhookLogs     WebhookLog[]
 }
+
+// === TENANTS ===
+// A specific customer instance of an application.
+// Lets "ABC SACCO" and "XYZ SACCO" run on the same codebase separately.
+
+model Tenant {
+  id               String     @id @default(cuid())
+  applicationId    String
+  application      Application @relation(fields: [applicationId], references: [id])
+  code             String     // 'abc-sacco'
+  name             String     // 'ABC SACCO'
+  defaultProviderId String?
+  defaultProvider   Provider?  @relation(fields: [defaultProviderId], references: [id])
+  isActive         Boolean    @default(true)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  paymentIntents   PaymentIntent[]
+
+  @@unique([applicationId, code])
+}
+
+// === PAYMENT TYPES ===
+// Lookup table instead of hardcoded enum — each app adds its own types.
+
+model PaymentType {
+  id            String     @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+  code          String     // 'deposit', 'loan_repayment', 'tithe'
+  description   String?
+  createdAt     DateTime   @default(now())
+
+  paymentIntents PaymentIntent[]
+
+  @@unique([applicationId, code])
+}
+
+// === PAYMENT INTENTS ===
+// One row per attempted payment. Current-state snapshot.
+// Full history lives in PaymentTransaction (append-only).
+
+model PaymentIntent {
+  id                String   @id @default(cuid())
+
+  applicationId     String
+  application       Application @relation(fields: [applicationId], references: [id])
+  tenantId          String?
+  tenant            Tenant?  @relation(fields: [tenantId], references: [id])
+  paymentTypeId     String?
+  paymentType       PaymentType? @relation(fields: [paymentTypeId], references: [id])
+
+  externalEntityId  String?                      // member_id, invoice_id from the source app
+  reference         String   @unique             // human-readable: SACCO-DEP-000123
+  idempotencyKey    String   @unique             // prevents duplicate intent creation
+
+  amount            Float    // using Float for SQLite compat; production uses numeric(14,2)
+  currency          String   @default("UGX")
+  phoneNumber       String?
+
+  providerId        String
+  provider          Provider @relation(fields: [providerId], references: [id])
+  providerPaymentId String?                      // the provider's own transaction id
+
+  status            String   @default("pending") // pending | processing | success | failed | expired | cancelled
+
+  metadata          String   @default("{}")      // JSON — opaque, passed through from source app
+  failureReason     String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  completedAt       DateTime?
+
+  transactions      PaymentTransaction[]
+  webhookLogs       WebhookLog[]
+  internalNotifications InternalNotification[]
+
+  @@index([applicationId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([providerPaymentId])
+}
+
+// === PAYMENT TRANSACTIONS ===
+// Append-only audit log. Every status change on PaymentIntent gets logged here.
 
 model PaymentTransaction {
-  id          String   @id @default(cuid())
-  paymentId   String
-  payment     Payment  @relation(fields: [paymentId], references: [id])
-  type        String
-  status      String
-  amount      Float
-  metadata    String?
-  createdAt   DateTime @default(now())
+  id                  String   @id @default(cuid())
+  paymentIntentId     String
+  paymentIntent       PaymentIntent @relation(fields: [paymentIntentId], references: [id])
+  status              String                       // matches the status that was set
+  rawProviderResponse String?                      // JSON — exact payload from provider
+  note                String?
+  createdAt           DateTime @default(now())
+
+  @@index([paymentIntentId])
+  @@index([createdAt])
 }
 
+// === WEBHOOK LOGS ===
+// Every webhook received, valid or not. Evidence trail for disputes and debugging.
+
 model WebhookLog {
-  id          String   @id @default(cuid())
-  paymentId   String?
-  payment     Payment? @relation(fields: [paymentId], references: [id])
-  provider    String
-  eventType   String
-  payload     String
-  signature   String?
-  verified    Boolean  @default(false)
-  processed   Boolean  @default(false)
-  error       String?
-  createdAt   DateTime @default(now())
+  id                String   @id @default(cuid())
+  providerId        String
+  provider          Provider @relation(fields: [providerId], references: [id])
+  paymentIntentId   String?                      // nullable — may not be resolvable yet
+  paymentIntent     PaymentIntent? @relation(fields: [paymentIntentId], references: [id])
+
+  payload           String                       // JSON
+  headers           String?                      // JSON — signature header etc.
+  signatureValid    Boolean
+  processed         Boolean  @default(false)
+  processingError   String?
+  createdAt         DateTime @default(now())
+
+  @@index([providerId])
+  @@index([paymentIntentId])
+  @@index([createdAt])
+}
+
+// === INTERNAL NOTIFICATIONS ===
+// Tracks delivery of "payment completed" callbacks back to the source app.
+// Supports retry: cron polls status in ('pending','failed_retrying') and nextRetryAt <= now()
+
+model InternalNotification {
+  id                String   @id @default(cuid())
+  paymentIntentId   String
+  paymentIntent     PaymentIntent @relation(fields: [paymentIntentId], references: [id])
+  applicationId     String
+  application       Application @relation(fields: [applicationId], references: [id])
+
+  url               String                       // target callback URL
+  payload           String                       // JSON — exact snapshot sent
+
+  status            String   @default("pending") // pending | delivered | failed_retrying | failed_exhausted
+  attemptCount      Int      @default(0)
+  maxAttempts       Int      @default(5)
+
+  lastAttemptAt     DateTime?
+  nextRetryAt       DateTime?
+
+  lastResponseStatus Int?                        // HTTP status code
+  lastResponseBody  String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([paymentIntentId])
 }
