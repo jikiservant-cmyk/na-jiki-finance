@@ -12,43 +12,43 @@ export class LivePayProvider implements PaymentProvider {
   name = 'LivePay'
 
   private apiKey: string
-  private apiSecret: string
+  private accountNo: string
+  private webhookSecret: string
   private baseUrl: string
 
   constructor() {
     this.apiKey = process.env.LIVEPAY_API_KEY || ''
-    this.apiSecret = process.env.LIVEPAY_API_SECRET || ''
-    this.baseUrl = process.env.LIVEPAY_BASE_URL || 'https://api.livepay.africa'
+    this.accountNo = process.env.LIVEPAY_ACCOUNT_NO || ''
+    this.webhookSecret = process.env.LIVEPAY_WEBHOOK_SECRET || ''
+    this.baseUrl = process.env.LIVEPAY_BASE_URL || 'https://livepay.me'
   }
 
   async initiatePayment(params: InitiatePaymentParams): Promise<InitiatePaymentResponse> {
     try {
-      // Example LivePay API request (adjust according to actual LivePay docs)
       const payload = {
+        accountNumber: this.accountNo,
+        phoneNumber: params.phoneNumber,
         amount: params.amount,
-        currency: params.currency,
-        phone_number: params.phoneNumber,
-        merchant_reference: params.reference,
+        currency: params.currency || 'UGX',
+        reference: params.reference,
         description: params.description || 'Payment',
-        metadata: params.metadata,
       }
 
-      const response = await fetch(`${this.baseUrl}/v1/payments/initiate`, {
+      const response = await fetch(`${this.baseUrl}/api/collect-money`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`,
-          'X-API-Secret': this.apiSecret,
         },
         body: JSON.stringify(payload),
       })
 
       const data = await response.json()
 
-      if (response.ok && data.status === 'success') {
+      if (response.ok && data.success) {
         return {
           success: true,
-          providerPaymentId: data.transaction_id,
+          providerPaymentId: data.internal_reference,
           status: 'processing',
           metadata: data,
         }
@@ -57,7 +57,7 @@ export class LivePayProvider implements PaymentProvider {
       return {
         success: false,
         status: 'failed',
-        failureReason: data.message || 'Failed to initiate payment',
+        failureReason: data.error || 'Failed to initiate payment',
       }
     } catch (error) {
       return {
@@ -69,81 +69,71 @@ export class LivePayProvider implements PaymentProvider {
   }
 
   async checkPaymentStatus(providerPaymentId: string): Promise<PaymentStatusResponse> {
-    try {
-      const response = await fetch(`${this.baseUrl}/v1/payments/${providerPaymentId}/status`, {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'X-API-Secret': this.apiSecret,
-        },
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        // Map LivePay status to our standard status
-        const statusMap: Record<string, any> = {
-          'pending': 'pending',
-          'processing': 'processing',
-          'completed': 'success',
-          'failed': 'failed',
-          'expired': 'expired',
-          'cancelled': 'cancelled',
-        }
-
-        return {
-          success: true,
-          status: statusMap[data.status] || 'pending',
-          amount: data.amount,
-          currency: data.currency,
-          providerPaymentId: data.transaction_id,
-        }
-      }
-
-      return {
-        success: false,
-        status: 'failed',
-        failureReason: data.message || 'Failed to check status',
-      }
-    } catch (error) {
-      return {
-        success: false,
-        status: 'failed',
-        failureReason: error instanceof Error ? error.message : 'Unknown error',
-      }
+    // LivePay doesn't have a documented status check endpoint, so we'll rely on webhooks
+    return {
+      success: true,
+      status: 'pending',
+      amount: 0,
+      currency: 'UGX',
+      providerPaymentId,
     }
   }
 
-  async validateWebhookSignature(payload: string, signature: string, headers?: Record<string, string>): Promise<boolean> {
+  async validateWebhookSignature(
+    payload: string,
+    signatureHeader: string,
+    headers?: Record<string, string>
+  ): Promise<boolean> {
     try {
-      // Example signature validation (adjust according to LivePay docs)
-      // LivePay might use HMAC-SHA256 with API secret
-      const hmac = crypto.createHmac('sha256', this.apiSecret)
-      const computedSignature = hmac.update(payload).digest('hex')
-      return computedSignature === signature
+      if (!headers || !headers['x-webhook-signature']) {
+        return false
+      }
+
+      const signatureHeaderValue = headers['x-webhook-signature']
+      const [timestampPart, signaturePart] = signatureHeaderValue.split(',')
+      const timestamp = timestampPart.split('=')[1]
+      const receivedSignature = signaturePart.split('=')[1]
+
+      const webhookPayload = JSON.parse(payload)
+      const params = {
+        status: webhookPayload.status,
+        customer_reference: webhookPayload.customer_reference,
+        internal_reference: webhookPayload.internal_reference,
+      }
+
+      const sortedKeys = Object.keys(params).sort()
+      const webhookUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      let stringToSign = `${webhookUrl}/api/webhooks/livepay${timestamp}`
+
+      for (const key of sortedKeys) {
+        stringToSign += `${key}${params[key]}`
+      }
+
+      const expectedSignature = crypto
+        .createHmac('sha256', this.webhookSecret)
+        .update(stringToSign)
+        .digest('hex')
+
+      return receivedSignature === expectedSignature
     } catch {
       return false
     }
   }
 
   async parseWebhookPayload(payload: any): Promise<ParsedWebhook> {
-    // Map LivePay webhook to our standard format
     const statusMap: Record<string, any> = {
-      'payment_pending': 'pending',
-      'payment_processing': 'processing',
-      'payment_completed': 'success',
-      'payment_failed': 'failed',
-      'payment_expired': 'expired',
-      'payment_cancelled': 'cancelled',
+      'Success': 'success',
+      'Failed': 'failed',
     }
 
     return {
-      reference: payload.merchant_reference,
-      providerPaymentId: payload.transaction_id,
-      status: statusMap[payload.event_type] || 'pending',
+      reference: payload.customer_reference,
+      providerPaymentId: payload.internal_reference,
+      status: statusMap[payload.status] || 'pending',
       amount: payload.amount,
       currency: payload.currency,
       metadata: payload,
-      failureReason: payload.failure_reason,
+      failureReason: payload.status === 'Failed' ? 'Payment failed' : undefined,
     }
   }
 }

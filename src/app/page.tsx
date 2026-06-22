@@ -29,14 +29,17 @@ interface DashboardData {
   notifStats: { total: number; delivered: number; pending: number; retrying: number; exhausted: number }
 }
 
-const fmt = (n: number) => {
+const fmt = (n: number | undefined | null) => {
+  if (typeof n !== 'number' || isNaN(n)) return 'UGX 0'
   if (n >= 1000000) return `UGX ${(n / 1000000).toFixed(1)}M`
   if (n >= 1000) return `UGX ${(n / 1000).toFixed(0)}K`
   return `UGX ${n.toLocaleString()}`
 }
 
-const fmtDate = (d: string | Date) => {
+const fmtDate = (d: string | Date | undefined | null) => {
+  if (!d) return '—'
   const date = new Date(d)
+  if (isNaN(date.getTime())) return '—'
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
@@ -77,10 +80,12 @@ function StatCard({ label, value, sub, accent, delay }: { label: string; value: 
 
 function BarChart({ data, maxVal, color, failData }: { data: number[]; maxVal: number; color: string; failData?: number[] }) {
   const [hoveredBar, setHoveredBar] = useState<number | null>(null)
+  const safeData = Array.isArray(data) ? data : []
+  const safeFailData = Array.isArray(failData) ? failData : []
   return (
     <div className="space-y-1">
       <div className="flex items-end gap-1.5 h-24">
-        {data.map((v, i) => (
+        {safeData.map((v, i) => (
           <motion.div
             key={i}
             initial={{ height: 0 }}
@@ -103,9 +108,9 @@ function BarChart({ data, maxVal, color, failData }: { data: number[]; maxVal: n
           </motion.div>
         ))}
       </div>
-      {failData && (
+      {safeFailData && safeFailData.length > 0 && (
         <div className="flex items-end gap-1.5 h-8">
-          {failData.map((v, i) => (
+          {safeFailData.map((v, i) => (
             <motion.div
               key={i}
               initial={{ height: 0 }}
@@ -129,7 +134,27 @@ export default function HomePage() {
     fetch('/api/dashboard').then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
-  const maxDaily = data ? Math.max(...data.dailyRevenue.map(d => d.revenue), 1) : 1
+  const safeData = data || {
+    totalRevenue: 0,
+    statusCounts: { success: 0, pending: 0, processing: 0, failed: 0, expired: 0, cancelled: 0 },
+    successRate: '0',
+    appRevenue: [],
+    providerRevenue: [],
+    tenantRevenue: [],
+    dailyRevenue: [],
+    funnel: [],
+    recentIntents: [],
+    totalPayments: 0,
+    notifStats: { total: 0, delivered: 0, pending: 0, retrying: 0, exhausted: 0 }
+  }
+
+  // Extra safety checks
+  const safeStatusCounts = safeData.statusCounts || { success: 0, pending: 0, processing: 0, failed: 0, expired: 0, cancelled: 0 }
+  const safeNotifStats = safeData.notifStats || { total: 0, delivered: 0, pending: 0, retrying: 0, exhausted: 0 }
+
+  const maxDaily = Array.isArray(safeData.dailyRevenue) && safeData.dailyRevenue.length > 0 
+    ? Math.max(...safeData.dailyRevenue.map(d => d.revenue), 1) 
+    : 1
 
   return (
     <main className="min-h-screen relative">
@@ -185,18 +210,18 @@ export default function HomePage() {
               </motion.div>
             ))}
           </div>
-        ) : data && (
+        ) : (
           <div className="px-6 md:px-16 lg:px-24 py-4 space-y-6">
 
             {/* Top stats — 3D tilt cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 scene-3d">
               {[
-                { label: 'Total Revenue', value: fmt(data.totalRevenue), sub: `${data.totalPayments} intents`, accent: '#4ade80', delay: 1.6 },
-                { label: 'Success Rate', value: `${data.successRate}%`, sub: `${data.statusCounts.success} successful`, accent: '#34d399', delay: 1.7 },
-                { label: 'Processing', value: String(data.statusCounts.processing), sub: 'Awaiting customer', delay: 1.8 },
-                { label: 'Pending', value: String(data.statusCounts.pending), sub: 'Not yet sent', delay: 1.9 },
-                { label: 'Failed', value: String(data.statusCounts.failed), sub: 'Needs attention', accent: '#f87171', delay: 2.0 },
-                { label: 'Expired', value: String(data.statusCounts.expired), sub: 'Timed out', delay: 2.1 },
+                { label: 'Total Revenue', value: fmt(safeData.totalRevenue), sub: `${safeData.totalPayments} intents`, accent: '#4ade80', delay: 1.6 },
+                { label: 'Success Rate', value: `${safeData.successRate}%`, sub: `${safeStatusCounts.success} successful`, accent: '#34d399', delay: 1.7 },
+                { label: 'Processing', value: String(safeStatusCounts.processing), sub: 'Awaiting customer', delay: 1.8 },
+                { label: 'Pending', value: String(safeStatusCounts.pending), sub: 'Not yet sent', delay: 1.9 },
+                { label: 'Failed', value: String(safeStatusCounts.failed), sub: 'Needs attention', accent: '#f87171', delay: 2.0 },
+                { label: 'Expired', value: String(safeStatusCounts.expired), sub: 'Timed out', delay: 2.1 },
               ].map((stat, i) => (
                 <TiltCard key={stat.label} tiltAmount={8}>
                   <motion.div
@@ -226,8 +251,8 @@ export default function HomePage() {
               <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 2.2, duration: 0.6 }}>
                 <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase">Revenue by Application</span>
                 <div className="space-y-3 mt-3">
-                  {data.appRevenue.map((app, i) => {
-                    const pct = data.totalRevenue > 0 ? (app.revenue / data.totalRevenue) * 100 : 0
+                  {(Array.isArray(safeData.appRevenue) ? safeData.appRevenue : []).map((app, i) => {
+                    const pct = safeData.totalRevenue > 0 ? (app.revenue / safeData.totalRevenue) * 100 : 0
                     return (
                       <motion.div
                         key={app.code}
@@ -262,7 +287,7 @@ export default function HomePage() {
               <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 2.4, duration: 0.6 }}>
                 <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase">Payment Funnel</span>
                 <div className="space-y-3 mt-3">
-                  {data.funnel.map((f, i) => (
+                  {(Array.isArray(safeData.funnel) ? safeData.funnel : []).map((f, i) => (
                     <motion.div
                       key={f.application}
                       initial={{ opacity: 0, x: 20 }}
@@ -321,7 +346,12 @@ export default function HomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.2 }} className="stat-card p-4 md:p-6 bg-card border border-border/50 rounded-xl">
                 <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase block mb-4">Daily Revenue — 14 Days</span>
-                <BarChart data={data.dailyRevenue.map(d => d.revenue)} maxVal={maxDaily} color="#4ade80" failData={data.dailyRevenue.map(d => d.failed)} />
+                <BarChart 
+                  data={(Array.isArray(safeData.dailyRevenue) ? safeData.dailyRevenue : []).map(d => d.revenue)} 
+                  maxVal={maxDaily} 
+                  color="#4ade80" 
+                  failData={(Array.isArray(safeData.dailyRevenue) ? safeData.dailyRevenue : []).map(d => d.failed)} 
+                />
                 <div className="flex justify-between mt-2">
                   <span className="text-[10px] font-mono text-muted-foreground">14 days ago</span>
                   <span className="text-[10px] font-mono text-muted-foreground">Today</span>
@@ -331,8 +361,11 @@ export default function HomePage() {
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.3 }} className="stat-card p-4 md:p-6 bg-card border border-border/50 rounded-xl">
                 <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase block mb-4">Revenue by Provider</span>
                 <div className="space-y-3">
-                  {data.providerRevenue.map((p, i) => {
-                    const maxP = Math.max(...data.providerRevenue.map(x => x.revenue), 1)
+                  {(Array.isArray(safeData.providerRevenue) ? safeData.providerRevenue : []).map((p, i) => {
+                    const providerRevenueArray = Array.isArray(safeData.providerRevenue) ? safeData.providerRevenue : []
+                    const maxP = providerRevenueArray.length > 0 
+                      ? Math.max(...providerRevenueArray.map(x => x.revenue), 1) 
+                      : 1
                     return (
                       <motion.div key={p.code} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3.4 + i * 0.08 }}>
                         <div className="flex justify-between mb-1">
@@ -360,7 +393,7 @@ export default function HomePage() {
               <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 3.6 }} className="stat-card p-4 md:p-6 bg-card border border-border/50 rounded-xl">
                 <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase block mb-4">Revenue by Tenant</span>
                 <div className="space-y-2">
-                  {data.tenantRevenue.map((t, i) => (
+                  {(Array.isArray(safeData.tenantRevenue) ? safeData.tenantRevenue : []).map((t, i) => (
                     <motion.div key={t.code} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 3.7 + i * 0.08 }}
                       className="table-row-hover flex items-center justify-between py-2.5 px-3 border-b border-border/30 rounded-lg"
                     >
@@ -381,10 +414,10 @@ export default function HomePage() {
                 <span className="text-[10px] font-mono tracking-[0.2em] text-muted-foreground uppercase block mb-4">Internal Notifications</span>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: 'Delivered', value: data.notifStats.delivered, color: '#34d399' },
-                    { label: 'Pending', value: data.notifStats.pending, color: '#fbbf24' },
-                    { label: 'Retrying', value: data.notifStats.retrying, color: '#38bdf8' },
-                    { label: 'Exhausted', value: data.notifStats.exhausted, color: '#f87171' },
+                    { label: 'Delivered', value: safeNotifStats.delivered, color: '#34d399' },
+                    { label: 'Pending', value: safeNotifStats.pending, color: '#fbbf24' },
+                    { label: 'Retrying', value: safeNotifStats.retrying, color: '#38bdf8' },
+                    { label: 'Exhausted', value: safeNotifStats.exhausted, color: '#f87171' },
                   ].map((n, i) => (
                     <motion.div key={n.label} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 3.9 + i * 0.08, type: 'spring', stiffness: 200 }}
                       className="p-3 bg-foreground/[0.03] border border-border/30 rounded-lg text-center"
@@ -423,7 +456,7 @@ export default function HomePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.recentIntents.slice(0, 10).map((p, i) => (
+                    {(Array.isArray(safeData.recentIntents) ? safeData.recentIntents : []).slice(0, 10).map((p, i) => (
                       <motion.tr key={p.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 4.3 + i * 0.03 }}
                         className="table-row-hover border-b border-border/20"
                       >

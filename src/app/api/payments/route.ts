@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getPaymentProvider } from '@/lib/providers'
 import { createPaymentTransaction } from '@/lib/data'
-import { randomUUID } from 'crypto'
-import { CreatePaymentRequestSchema, InternalNotificationPayloadSchema } from '@/lib/schemas'
+import { CreatePaymentRequestSchema } from '@/lib/schemas'
 
 export async function POST(request: Request) {
   try {
@@ -20,7 +19,7 @@ export async function POST(request: Request) {
     }
 
     // 3. Find tenant (optional)
-    let tenant = null
+    let tenant: Awaited<ReturnType<typeof db.tenant.findFirst>> = null
     if (validatedBody.tenantCode) {
       tenant = await db.tenant.findFirst({
         where: { applicationId: application.id, code: validatedBody.tenantCode, isActive: true },
@@ -30,16 +29,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Find payment type
-    const paymentType = await db.paymentType.findFirst({
-      where: { applicationId: application.id, code: validatedBody.paymentTypeCode },
-    })
-    if (!paymentType) {
-      return NextResponse.json({ error: 'Invalid payment type' }, { status: 404 })
+    // 4. Find payment type (optional)
+    let paymentType: Awaited<ReturnType<typeof db.paymentType.findFirst>> = null
+    if (validatedBody.paymentTypeCode) {
+      paymentType = await db.paymentType.findFirst({
+        where: { applicationId: application.id, code: validatedBody.paymentTypeCode },
+      })
     }
 
     // 5. Find provider - use tenant default or first active provider for app
-    let provider = null
+    let provider: Awaited<ReturnType<typeof db.provider.findFirst>> = null
     if (tenant?.defaultProviderId) {
       provider = await db.provider.findFirst({
         where: { id: tenant.defaultProviderId, isActive: true },
@@ -67,14 +66,14 @@ export async function POST(request: Request) {
     }
 
     // 7. Generate reference
-    const reference = `${validatedBody.applicationCode.toUpperCase()}-${validatedBody.paymentTypeCode.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`
+    const reference = `${validatedBody.applicationCode.toUpperCase()}-${(validatedBody.paymentTypeCode || 'PAY').toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`
 
     // 8. Create payment intent in DB
     const paymentIntent = await db.paymentIntent.create({
       data: {
         applicationId: application.id,
         tenantId: tenant?.id || null,
-        paymentTypeId: paymentType.id,
+        paymentTypeId: paymentType?.id || null,
         externalEntityId: validatedBody.externalEntityId,
         reference,
         idempotencyKey: validatedBody.idempotencyKey,
@@ -83,7 +82,7 @@ export async function POST(request: Request) {
         phoneNumber: validatedBody.phoneNumber,
         providerId: provider.id,
         status: 'pending',
-        metadata: JSON.stringify(validatedBody.metadata),
+        metadata: JSON.stringify(validatedBody.metadata || {}),
       },
       include: {
         application: true,
@@ -99,8 +98,8 @@ export async function POST(request: Request) {
       currency: validatedBody.currency,
       phoneNumber: validatedBody.phoneNumber,
       reference,
-      description: `Payment for ${validatedBody.paymentTypeCode}`,
-      metadata: { ...validatedBody.metadata, paymentIntentId: paymentIntent.id },
+      description: `Payment for ${validatedBody.paymentTypeCode || 'payment'}`,
+      metadata: { ...(validatedBody.metadata || {}), paymentIntentId: paymentIntent.id },
     })
 
     // 10. Update payment intent with provider response

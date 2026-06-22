@@ -19,14 +19,17 @@ interface DashboardData {
   appRevenue: { code: string; name: string }[]
 }
 
-const fmt = (n: number) => {
+const fmt = (n: number | undefined | null) => {
+  if (typeof n !== 'number' || isNaN(n)) return 'UGX 0'
   if (n >= 1000000) return `UGX ${(n / 1000000).toFixed(1)}M`
   if (n >= 1000) return `UGX ${(n / 1000).toFixed(0)}K`
   return `UGX ${n.toLocaleString()}`
 }
 
-const fmtDate = (d: string | Date) => {
+const fmtDate = (d: string | Date | undefined | null) => {
+  if (!d) return '—'
   const date = new Date(d)
+  if (isNaN(date.getTime())) return '—'
   return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
@@ -41,10 +44,14 @@ export default function TransactionsPage() {
   const [filterType, setFilterType] = useState('ALL')
 
   useEffect(() => {
-    fetch('/api/dashboard').then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
+    fetch('/api/dashboard')
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
-  const payments = data?.recentIntents || []
+  const safeRecentIntents = Array.isArray(data?.recentIntents) ? data.recentIntents : []
+  const payments = safeRecentIntents
   const filtered = payments.filter(p => {
     if (filterApp !== 'ALL' && p.applicationCode !== filterApp) return false
     if (filterStatus !== 'ALL' && p.status !== filterStatus) return false

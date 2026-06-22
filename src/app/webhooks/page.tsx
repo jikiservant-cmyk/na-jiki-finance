@@ -33,12 +33,22 @@ export default function WebhooksPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/webhooks').then(r => r.json()).then(d => { setLogs(d); setLoading(false) }).catch(() => setLoading(false))
+    fetch('/api/webhooks')
+      .then(r => r.json())
+      .then(d => { 
+        setLogs(Array.isArray(d) ? d : []); 
+        setLoading(false) 
+      })
+      .catch(() => { 
+        setLogs([]); 
+        setLoading(false) 
+      })
   }, [])
 
-  const verifiedCount = logs.filter(l => l.signatureValid).length
-  const processedCount = logs.filter(l => l.processed).length
-  const errorCount = logs.filter(l => l.processingError).length
+  const safeLogs = Array.isArray(logs) ? logs : []
+  const verifiedCount = safeLogs.filter(l => l.signatureValid).length
+  const processedCount = safeLogs.filter(l => l.processed).length
+  const errorCount = safeLogs.filter(l => l.processingError).length
 
   return (
     <main className="min-h-screen relative">
@@ -53,7 +63,7 @@ export default function WebhooksPage() {
               <p className="text-sm text-foreground/40 mt-1">Every webhook received — valid or not. Evidence trail for disputes and debugging.</p>
             </div>
             <div className="flex gap-4 text-sm font-mono">
-              <span className="text-foreground/40">{logs.length} total</span>
+              <span className="text-foreground/40">{safeLogs.length} total</span>
               <span className="text-foreground/20">|</span>
               <span className="text-green-400/70">{verifiedCount} verified</span>
               <span className="text-foreground/20">|</span>
@@ -67,11 +77,11 @@ export default function WebhooksPage() {
           <div className="grid grid-cols-3 gap-4">
             <div className="p-4 bg-card border border-foreground/10">
               <span className="text-[10px] font-mono tracking-[0.2em] text-foreground/30 uppercase">Signature Verified</span>
-              <div className="text-xl font-black text-green-400 mt-1">{verifiedCount} / {logs.length}</div>
+              <div className="text-xl font-black text-green-400 mt-1">{verifiedCount} / {safeLogs.length}</div>
             </div>
             <div className="p-4 bg-card border border-foreground/10">
               <span className="text-[10px] font-mono tracking-[0.2em] text-foreground/30 uppercase">Processed</span>
-              <div className="text-xl font-black text-blue-400 mt-1">{processedCount} / {logs.length}</div>
+              <div className="text-xl font-black text-blue-400 mt-1">{processedCount} / {safeLogs.length}</div>
             </div>
             <div className="p-4 bg-card border border-foreground/10">
               <span className="text-[10px] font-mono tracking-[0.2em] text-foreground/30 uppercase">Errors</span>
@@ -85,7 +95,7 @@ export default function WebhooksPage() {
             <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 bg-card border border-foreground/5 animate-pulse" />)}</div>
           ) : (
             <div className="space-y-2">
-              {logs.map((log, i) => (
+              {safeLogs.map((log, i) => (
                 <motion.div key={log.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="bg-card border border-foreground/10">
                   <button onClick={() => setExpandedId(expandedId === log.id ? null : log.id)} className="w-full flex items-center justify-between p-4 text-left hover:bg-foreground/[0.02]">
                     <div className="flex items-center gap-4">
@@ -160,7 +170,7 @@ export default function WebhooksPage() {
                   )}
                 </motion.div>
               ))}
-              {logs.length === 0 && <div className="p-8 text-center text-sm text-foreground/30 font-mono">No webhook logs found</div>}
+              {safeLogs.length === 0 && <div className="p-8 text-center text-sm text-foreground/30 font-mono">No webhook logs found</div>}
             </div>
           )}
         </div>
