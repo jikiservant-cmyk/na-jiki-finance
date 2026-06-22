@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getPaymentProvider } from '@/lib/providers'
-import { createPaymentTransaction } from '@/lib/data'
 import { CreatePaymentRequestSchema } from '@/lib/schemas'
 
 export async function POST(request: Request) {
@@ -11,18 +10,21 @@ export async function POST(request: Request) {
     const validatedBody = CreatePaymentRequestSchema.parse(rawBody)
 
     // 2. Find application by code
-    const application = await db.application.findFirst({
-      where: { code: validatedBody.applicationCode, isActive: true },
+    const application = await db.applications.findFirst({
+      where: { code: validatedBody.applicationCode, is_active: true },
     })
     if (!application) {
       return NextResponse.json({ error: 'Invalid or inactive application' }, { status: 404 })
     }
 
-    // 3. Find tenant (optional)
-    let tenant: Awaited<ReturnType<typeof db.tenant.findFirst>> = null
+    // 3. Find tenant (optional) - using tenantCode as the UUID id
+    let tenant: Awaited<ReturnType<typeof db.tenants.findFirst>> = null
     if (validatedBody.tenantCode) {
-      tenant = await db.tenant.findFirst({
-        where: { applicationId: application.id, code: validatedBody.tenantCode, isActive: true },
+      tenant = await db.tenants.findFirst({
+        where: { 
+          id: validatedBody.tenantCode, // tenantCode is the UUID
+          app_type: validatedBody.applicationCode // app_type should match application code
+        },
       })
       if (!tenant) {
         return NextResponse.json({ error: 'Invalid or inactive tenant' }, { status: 404 })
@@ -30,32 +32,25 @@ export async function POST(request: Request) {
     }
 
     // 4. Find payment type (optional)
-    let paymentType: Awaited<ReturnType<typeof db.paymentType.findFirst>> = null
+    let paymentType: Awaited<ReturnType<typeof db.payment_types.findFirst>> = null
     if (validatedBody.paymentTypeCode) {
-      paymentType = await db.paymentType.findFirst({
-        where: { applicationId: application.id, code: validatedBody.paymentTypeCode },
+      paymentType = await db.payment_types.findFirst({
+        where: { application_id: application.id, code: validatedBody.paymentTypeCode },
       })
     }
 
-    // 5. Find provider - use tenant default or first active provider for app
-    let provider: Awaited<ReturnType<typeof db.provider.findFirst>> = null
-    if (tenant?.defaultProviderId) {
-      provider = await db.provider.findFirst({
-        where: { id: tenant.defaultProviderId, isActive: true },
-      })
-    }
-    if (!provider) {
-      provider = await db.provider.findFirst({
-        where: { isActive: true },
-      })
-    }
+    // 5. Find first active provider
+    let provider: Awaited<ReturnType<typeof db.providers.findFirst>> = null
+    provider = await db.providers.findFirst({
+      where: { is_active: true },
+    })
     if (!provider) {
       return NextResponse.json({ error: 'No active payment provider available' }, { status: 500 })
     }
 
     // 6. Check idempotency key to prevent duplicate payments
-    const existingIntent = await db.paymentIntent.findFirst({
-      where: { idempotencyKey: validatedBody.idempotencyKey },
+    const existingIntent = await db.payment_intents.findFirst({
+      where: { idempotency_key: validatedBody.idempotencyKey },
     })
     if (existingIntent) {
       return NextResponse.json({
@@ -69,25 +64,25 @@ export async function POST(request: Request) {
     const reference = `${validatedBody.applicationCode.toUpperCase()}-${(validatedBody.paymentTypeCode || 'PAY').toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`
 
     // 8. Create payment intent in DB
-    const paymentIntent = await db.paymentIntent.create({
+    const paymentIntent = await db.payment_intents.create({
       data: {
-        applicationId: application.id,
-        tenantId: tenant?.id || null,
-        paymentTypeId: paymentType?.id || null,
-        externalEntityId: validatedBody.externalEntityId,
+        application_id: application.id,
+        tenant_id: tenant?.id || null,
+        payment_type_id: paymentType?.id || null,
+        external_entity_id: validatedBody.externalEntityId,
         reference,
-        idempotencyKey: validatedBody.idempotencyKey,
+        idempotency_key: validatedBody.idempotencyKey,
         amount: validatedBody.amount,
         currency: validatedBody.currency,
-        phoneNumber: validatedBody.phoneNumber,
-        providerId: provider.id,
+        phone_number: validatedBody.phoneNumber,
+        provider_id: provider.id,
         status: 'pending',
-        metadata: JSON.stringify(validatedBody.metadata || {}),
+        metadata: validatedBody.metadata || {},
       },
       include: {
-        application: true,
-        tenant: true,
-        provider: true,
+        applications: true,
+        tenants: true,
+        providers: true,
       },
     })
 
@@ -103,28 +98,24 @@ export async function POST(request: Request) {
     })
 
     // 10. Update payment intent with provider response
-    const updatedIntent = await db.paymentIntent.update({
+    const updatedIntent = await db.payment_intents.update({
       where: { id: paymentIntent.id },
       data: {
         status: providerResponse.status,
-        providerPaymentId: providerResponse.providerPaymentId,
-        failureReason: providerResponse.failureReason,
-        completedAt: providerResponse.status === 'success' ? new Date() : null,
-      },
-      include: {
-        application: true,
-        tenant: true,
-        provider: true,
+        provider_payment_id: providerResponse.providerPaymentId,
+        failure_reason: providerResponse.failureReason,
+        completed_at: providerResponse.status === 'success' ? new Date() : null,
       },
     })
 
     // 11. Create transaction log
-    await createPaymentTransaction({
-      paymentId: paymentIntent.id,
-      type: 'PAYMENT_INITIATED',
-      status: providerResponse.status,
-      amount: validatedBody.amount,
-      metadata: JSON.stringify(providerResponse),
+    await db.payment_transactions.create({
+      data: {
+        payment_intent_id: paymentIntent.id,
+        status: providerResponse.status,
+        raw_provider_response: providerResponse,
+        note: 'PAYMENT_INITIATED',
+      },
     })
 
     // 12. Return response to application

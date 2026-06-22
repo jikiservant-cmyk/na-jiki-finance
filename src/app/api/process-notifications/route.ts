@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getPendingNotifications } from '@/lib/data'
 
 export async function POST() {
   try {
-    const pendingNotifications = await getPendingNotifications()
+    const pendingNotifications = await db.internal_notifications.findMany({
+      where: { status: { in: ['pending', 'failed_retrying'] } },
+      include: { payment_intents: { include: { applications: true } }, applications: true },
+      orderBy: { created_at: 'asc' },
+    })
     const results: Array<{
       id: string
       status: 'delivered' | 'failed_retrying' | 'failed_exhausted'
@@ -23,61 +26,61 @@ export async function POST() {
             'Content-Type': 'application/json',
             'X-Najiki-Notification': 'true',
           },
-          body: notification.payload,
+          body: JSON.stringify(notification.payload),
         })
 
         if (response.ok) {
           // Success!
-          await db.internalNotification.update({
+          await db.internal_notifications.update({
             where: { id: notification.id },
             data: {
               status: 'delivered',
-              attemptCount: notification.attemptCount + 1,
-              lastAttemptAt: new Date(),
-              lastResponseStatus: response.status,
-              nextRetryAt: null,
+              attempt_count: notification.attempt_count + 1,
+              last_attempt_at: new Date(),
+              last_response_status: response.status,
+              next_retry_at: null,
             },
           })
           results.push({ id: notification.id, status: 'delivered', statusCode: response.status })
         } else {
           // Failed but we might retry
-          const newAttemptCount = notification.attemptCount + 1
-          const shouldRetry = newAttemptCount < (notification.maxAttempts || 5)
+          const newAttemptCount = notification.attempt_count + 1
+          const shouldRetry = newAttemptCount < (notification.max_attempts || 5)
           const newStatus = shouldRetry ? 'failed_retrying' : 'failed_exhausted'
           const nextRetryAt = shouldRetry 
             ? new Date(Date.now() + Math.pow(2, newAttemptCount) * 60000) // Exponential backoff
             : null
 
-          await db.internalNotification.update({
+          await db.internal_notifications.update({
             where: { id: notification.id },
             data: {
               status: newStatus,
-              attemptCount: newAttemptCount,
-              lastAttemptAt: new Date(),
-              lastResponseStatus: response.status,
-              nextRetryAt,
+              attempt_count: newAttemptCount,
+              last_attempt_at: new Date(),
+              last_response_status: response.status,
+              next_retry_at: nextRetryAt,
             },
           })
           results.push({ id: notification.id, status: newStatus, statusCode: response.status })
         }
       } catch (error) {
         // Network error or other failure
-        const newAttemptCount = notification.attemptCount + 1
-        const shouldRetry = newAttemptCount < (notification.maxAttempts || 5)
+        const newAttemptCount = notification.attempt_count + 1
+        const shouldRetry = newAttemptCount < (notification.max_attempts || 5)
         const newStatus = shouldRetry ? 'failed_retrying' : 'failed_exhausted'
         const nextRetryAt = shouldRetry 
           ? new Date(Date.now() + Math.pow(2, newAttemptCount) * 60000)
           : null
 
-        await db.internalNotification.update({
+        await db.internal_notifications.update({
           where: { id: notification.id },
           data: {
             status: newStatus,
-            attemptCount: newAttemptCount,
-            lastAttemptAt: new Date(),
-            lastResponseStatus: null,
-            lastResponseBody: error instanceof Error ? error.message : 'Unknown error',
-            nextRetryAt,
+            attempt_count: newAttemptCount,
+            last_attempt_at: new Date(),
+            last_response_status: null,
+            last_response_body: error instanceof Error ? error.message : 'Unknown error',
+            next_retry_at: nextRetryAt,
           },
         })
         results.push({ id: notification.id, status: newStatus, error: error instanceof Error ? error.message : 'Unknown error' })

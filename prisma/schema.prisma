@@ -3,205 +3,170 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider   = "postgresql"
+  url      = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  schemas  = ["public"]
 }
 
-// === APPLICATIONS ===
-// The apps allowed to use this payment service (sacco, church, school, ...)
+model applications {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                   String                   @unique
+  name                   String
+  base_url               String
+  webhook_path           String                   @default("/api/internal/payment-completed")
+  internal_secret_ref    String
+  is_active               Boolean                  @default(true)
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  internal_notifications internal_notifications[]
+  payment_intents        payment_intents[]
+  payment_types          payment_types[]
 
-model Application {
-  id                String   @id @default(cuid())
-  code              String   @unique             // 'sacco', 'church'
-  name              String                       // 'SACCO Platform'
-  baseUrl           String   @map("base_url")    // 'https://sacco.yourdomain.com'
-  webhookPath       String   @map("webhook_path") @default("/api/internal/payment-completed")
-  internalSecretRef String   @map("internal_secret_ref") // env var / vault key name — NEVER the secret itself
-  isActive          Boolean  @map("is_active")  @default(true)
-  createdAt         DateTime @map("created_at") @default(now())
-  updatedAt         DateTime @map("updated_at") @updatedAt
-
-  tenants           Tenant[]
-  paymentTypes      PaymentType[]
-  paymentIntents    PaymentIntent[]
-  internalNotifications InternalNotification[]
-
-  @@map("applications")
+  @@schema("public")
 }
 
-// === PROVIDERS ===
-// The payment gateways this service talks to (livepay, relworx, ...)
+model internal_notifications {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payment_intent_id    String              @db.Uuid
+  application_id       String              @db.Uuid
+  url                  String
+  payload              Json
+  status               notification_status @default(pending)
+  attempt_count        Int                 @default(0)
+  max_attempts         Int                 @default(5)
+  last_attempt_at      DateTime?           @db.Timestamptz(6)
+  next_retry_at        DateTime?           @db.Timestamptz(6)
+  last_response_status Int?
+  last_response_body   String?
+  created_at           DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime            @default(now()) @db.Timestamptz(6)
+  applications         applications        @relation(fields: [application_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payment_intents      payment_intents     @relation(fields: [payment_intent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-model Provider {
-  id              String   @id @default(cuid())
-  code            String   @unique              // 'livepay', 'relworx'
+  @@index([payment_intent_id], map: "idx_internal_notifications_intent")
+  @@schema("public")
+}
+
+model payment_intents {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  application_id         String                   @db.Uuid
+  tenant_id              String?                  @db.Uuid
+  payment_type_id        String?                  @db.Uuid
+  external_entity_id     String?
+  reference              String                   @unique
+  idempotency_key        String                   @unique
+  amount                 Decimal                  @db.Decimal(14, 2)
+  currency               String                   @default("UGX")
+  phone_number           String?
+  provider_id            String                   @db.Uuid
+  provider_payment_id    String?
+  status                 payment_status           @default(pending)
+  metadata               Json                     @default("{}")
+  failure_reason         String?
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  completed_at           DateTime?                @db.Timestamptz(6)
+  internal_notifications internal_notifications[]
+  applications           applications             @relation(fields: [application_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payment_types          payment_types?           @relation(fields: [payment_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  providers              providers                @relation(fields: [provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tenants                tenants?                 @relation(fields: [tenant_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payment_transactions   payment_transactions[]
+  webhook_logs           webhook_logs[]
+
+  @@index([application_id], map: "idx_payment_intents_application")
+  @@index([created_at], map: "idx_payment_intents_created_at")
+  @@index([provider_payment_id], map: "idx_payment_intents_provider_payment_id")
+  @@index([status], map: "idx_payment_intents_status")
+  @@index([tenant_id], map: "idx_payment_intents_tenant")
+  @@schema("public")
+}
+
+model payment_transactions {
+  id                    String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  payment_intent_id     String          @db.Uuid
+  status                payment_status
+  raw_provider_response Json?
+  note                  String?
+  created_at            DateTime        @default(now()) @db.Timestamptz(6)
+  payment_intents       payment_intents @relation(fields: [payment_intent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_payment_transactions_created_at")
+  @@index([payment_intent_id], map: "idx_payment_transactions_intent")
+  @@schema("public")
+}
+
+model payment_types {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  application_id  String            @db.Uuid
+  code            String
+  description     String?
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  payment_intents payment_intents[]
+  applications    applications      @relation(fields: [application_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([application_id, code])
+  @@schema("public")
+}
+
+model providers {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String            @unique
   name            String
-  credentialsRef  String   @map("credentials_ref") // env var / vault key prefix
-  isActive        Boolean  @map("is_active")  @default(true)
-  createdAt       DateTime @map("created_at") @default(now())
-  updatedAt       DateTime @map("updated_at") @updatedAt
+  credentials_ref String
+  is_active       Boolean           @default(true)
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+  payment_intents payment_intents[]
+  webhook_logs    webhook_logs[]
 
-  tenants         Tenant[]
-  paymentIntents  PaymentIntent[]
-  webhookLogs     WebhookLog[]
-
-  @@map("providers")
+  @@schema("public")
 }
 
-// === TENANTS ===
-// A specific customer instance of an application.
-// Lets "ABC SACCO" and "XYZ SACCO" run on the same codebase separately.
+model tenants {
+  id                  String                @id @db.Uuid
+  app_type            String
+  name                String?
+  created_at          DateTime              @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  payment_intents     payment_intents[]
 
-model Tenant {
-  id               String     @id @default(cuid())
-  applicationId    String     @map("application_id")
-  application      Application @relation(fields: [applicationId], references: [id])
-  code             String     // 'abc-sacco'
-  name             String     // 'ABC SACCO'
-  defaultProviderId String?   @map("default_provider_id")
-  defaultProvider   Provider?  @relation(fields: [defaultProviderId], references: [id])
-  isActive         Boolean    @map("is_active")  @default(true)
-  createdAt        DateTime   @map("created_at") @default(now())
-  updatedAt        DateTime   @map("updated_at") @updatedAt
-
-  paymentIntents   PaymentIntent[]
-
-  @@unique([applicationId, code])
-  @@map("tenants")
+  @@schema("public")
 }
 
-// === PAYMENT TYPES ===
-// Lookup table instead of hardcoded enum — each app adds its own types.
+model webhook_logs {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider_id       String           @db.Uuid
+  payment_intent_id String?          @db.Uuid
+  payload           Json
+  headers           Json?
+  signature_valid   Boolean
+  processed         Boolean          @default(false)
+  processing_error  String?
+  created_at        DateTime         @default(now()) @db.Timestamptz(6)
+  payment_intents   payment_intents? @relation(fields: [payment_intent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  providers         providers        @relation(fields: [provider_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-model PaymentType {
-  id            String     @id @default(cuid())
-  applicationId String     @map("application_id")
-  application   Application @relation(fields: [applicationId], references: [id])
-  code          String     // 'deposit', 'loan_repayment', 'tithe'
-  description   String?
-  createdAt     DateTime   @map("created_at") @default(now())
-
-  paymentIntents PaymentIntent[]
-
-  @@unique([applicationId, code])
-  @@map("payment_types")
+  @@index([created_at], map: "idx_webhook_logs_created_at")
+  @@index([payment_intent_id], map: "idx_webhook_logs_intent")
+  @@index([provider_id], map: "idx_webhook_logs_provider")
+  @@schema("public")
 }
 
-// === PAYMENT INTENTS ===
-// One row per attempted payment. Current-state snapshot.
-// Full history lives in PaymentTransaction (append-only).
-
-model PaymentIntent {
-  id                String   @id @default(cuid())
-
-  applicationId     String   @map("application_id")
-  application       Application @relation(fields: [applicationId], references: [id])
-  tenantId          String?  @map("tenant_id")
-  tenant            Tenant?  @relation(fields: [tenantId], references: [id])
-  paymentTypeId     String?  @map("payment_type_id")
-  paymentType       PaymentType? @relation(fields: [paymentTypeId], references: [id])
-
-  externalEntityId  String?  @map("external_entity_id") // member_id, invoice_id from the source app
-  reference         String   @unique             // human-readable: SACCO-DEP-000123
-  idempotencyKey    String   @map("idempotency_key") @unique // prevents duplicate intent creation
-
-  amount            Decimal  @db.Decimal(14,2) // Numeric(14,2) for financial precision!
-  currency          String   @default("UGX")
-  phoneNumber       String?  @map("phone_number")
-
-  providerId        String   @map("provider_id")
-  provider          Provider @relation(fields: [providerId], references: [id])
-  providerPaymentId String?  @map("provider_payment_id") // the provider's own transaction id
-
-  status            String   @default("pending") // pending | processing | success | failed | expired | cancelled
-
-  metadata          String   @default("{}")      // JSON — opaque, passed through from source app
-  failureReason     String?  @map("failure_reason")
-
-  createdAt         DateTime @map("created_at") @default(now())
-  updatedAt         DateTime @map("updated_at") @updatedAt
-  completedAt       DateTime? @map("completed_at")
-
-  transactions      PaymentTransaction[]
-  webhookLogs       WebhookLog[]
-  internalNotifications InternalNotification[]
-
-  @@index([applicationId])
-  @@index([tenantId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([providerPaymentId])
-  @@map("payment_intents")
+enum notification_status {
+  pending
+  delivered
+  failed_retrying
+  failed_exhausted
+  @@schema("public")
 }
 
-// === PAYMENT TRANSACTIONS ===
-// Append-only audit log. Every status change on PaymentIntent gets logged here.
-
-model PaymentTransaction {
-  id                  String   @id @default(cuid())
-  paymentIntentId     String   @map("payment_intent_id")
-  paymentIntent       PaymentIntent @relation(fields: [paymentIntentId], references: [id])
-  status              String                       // matches the status that was set
-  rawProviderResponse String?  @map("raw_provider_response") // JSON — exact payload from provider
-  note                String?
-  createdAt           DateTime @map("created_at") @default(now())
-
-  @@index([paymentIntentId])
-  @@index([createdAt])
-  @@map("payment_transactions")
-}
-
-// === WEBHOOK LOGS ===
-// Every webhook received, valid or not. Evidence trail for disputes and debugging.
-
-model WebhookLog {
-  id                String   @id @default(cuid())
-  providerId        String   @map("provider_id")
-  provider          Provider @relation(fields: [providerId], references: [id])
-  paymentIntentId   String?  @map("payment_intent_id") // nullable — may not be resolvable yet
-  paymentIntent     PaymentIntent? @relation(fields: [paymentIntentId], references: [id])
-
-  payload           String                       // JSON
-  headers           String?                      // JSON — signature header etc.
-  signatureValid    Boolean  @map("signature_valid")
-  processed         Boolean  @default(false)
-  processingError   String?  @map("processing_error")
-  createdAt         DateTime @map("created_at") @default(now())
-
-  @@index([providerId])
-  @@index([paymentIntentId])
-  @@index([createdAt])
-  @@map("webhook_logs")
-}
-
-// === INTERNAL NOTIFICATIONS ===
-// Tracks delivery of "payment completed" callbacks back to the source app.
-// Supports retry: cron polls status in ('pending','failed_retrying') and nextRetryAt <= now()
-
-model InternalNotification {
-  id                String   @id @default(cuid())
-  paymentIntentId   String   @map("payment_intent_id")
-  paymentIntent     PaymentIntent @relation(fields: [paymentIntentId], references: [id])
-  applicationId     String   @map("application_id")
-  application       Application @relation(fields: [applicationId], references: [id])
-
-  url               String                       // target callback URL
-  payload           String                       // JSON — exact snapshot sent
-
-  status            String   @default("pending") // pending | delivered | failed_retrying | failed_exhausted
-  attemptCount      Int      @map("attempt_count")  @default(0)
-  maxAttempts       Int      @map("max_attempts")  @default(5)
-
-  lastAttemptAt     DateTime? @map("last_attempt_at")
-  nextRetryAt       DateTime? @map("next_retry_at")
-
-  lastResponseStatus Int?   @map("last_response_status") // HTTP status code
-  lastResponseBody  String? @map("last_response_body")
-
-  createdAt         DateTime @map("created_at") @default(now())
-  updatedAt         DateTime @map("updated_at") @updatedAt
-
-  @@index([paymentIntentId])
-  @@map("internal_notifications")
+enum payment_status {
+  pending
+  processing
+  success
+  failed
+  expired
+  cancelled
+  @@schema("public")
 }

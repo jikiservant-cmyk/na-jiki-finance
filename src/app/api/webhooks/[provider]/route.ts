@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getPaymentProvider, getAvailableProviders } from '@/lib/providers'
-import { createWebhookLog, updateWebhookLog, createPaymentTransaction } from '@/lib/data'
 
 export async function POST(
   request: Request,
@@ -21,8 +20,8 @@ export async function POST(
     const providerClient = getPaymentProvider(providerCode)
 
     // 3. Find provider in DB
-    const provider = await db.provider.findFirst({
-      where: { code: providerCode.toLowerCase(), isActive: true },
+    const provider = await db.providers.findFirst({
+      where: { code: providerCode.toLowerCase(), is_active: true },
     })
     if (!provider) {
       return NextResponse.json({ error: 'Provider not active' }, { status: 404 })
@@ -36,17 +35,21 @@ export async function POST(
     )
 
     // 5. Create webhook log (even if invalid signature, for auditing)
-    let webhookLog = await createWebhookLog({
-      provider: providerCode,
-      eventType: 'WEBHOOK_RECEIVED',
-      payload: rawBody,
-      signature,
-      verified: isValidSignature,
-      processed: false,
+    let webhookLog = await db.webhook_logs.create({
+      data: {
+        provider_id: provider.id,
+        payload: rawBody,
+        headers: Object.fromEntries(request.headers.entries()),
+        signature_valid: isValidSignature,
+        processed: false,
+      },
     })
 
     if (!isValidSignature) {
-      await updateWebhookLog(webhookLog.id, { error: 'Invalid signature', processed: true })
+      await db.webhook_logs.update({
+        where: { id: webhookLog.id },
+        data: { processing_error: 'Invalid signature', processed: true },
+      })
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
@@ -54,52 +57,55 @@ export async function POST(
     const body = JSON.parse(rawBody)
     const parsedWebhook = await providerClient.parseWebhookPayload(body)
 
-    // 7. Find payment intent (do this first, outside transaction, to check if it exists)
-    const paymentIntent = await db.paymentIntent.findFirst({
+    // 7. Find payment intent
+    const paymentIntent = await db.payment_intents.findFirst({
       where: { reference: parsedWebhook.reference },
-      include: { application: true },
+      include: { applications: true },
     })
 
     if (!paymentIntent) {
-      await updateWebhookLog(webhookLog.id, { error: 'Payment not found', processed: true })
+      await db.webhook_logs.update({
+        where: { id: webhookLog.id },
+        data: { processing_error: 'Payment not found', processed: true },
+      })
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
     }
 
-    // 8. Wrap everything in a transaction to ensure atomicity!
+    // 8. Wrap everything in a transaction!
     await db.$transaction(async (tx) => {
       // Update payment intent status
-      const normalizedStatus = parsedWebhook.status.toLowerCase()
+      const normalizedStatus = parsedWebhook.status.toLowerCase() as any
       const updateData: any = {
         status: normalizedStatus,
       }
-      if (parsedWebhook.providerPaymentId) updateData.providerPaymentId = parsedWebhook.providerPaymentId
-      if (parsedWebhook.failureReason) updateData.failureReason = parsedWebhook.failureReason
+      if (parsedWebhook.providerPaymentId) updateData.provider_payment_id = parsedWebhook.providerPaymentId
+      if (parsedWebhook.failureReason) updateData.failure_reason = parsedWebhook.failureReason
       if (normalizedStatus === 'success' || normalizedStatus === 'failed') {
-        updateData.completedAt = new Date()
+        updateData.completed_at = new Date()
       }
-      await tx.paymentIntent.update({
+      await tx.payment_intents.update({
         where: { id: paymentIntent.id },
         data: updateData,
       })
 
       // Create transaction log
-      await tx.paymentTransaction.create({
+      await tx.payment_transactions.create({
         data: {
-          paymentIntentId: paymentIntent.id,
+          payment_intent_id: paymentIntent.id,
           status: normalizedStatus,
-          rawProviderResponse: rawBody,
+          raw_provider_response: rawBody,
           note: 'WEBHOOK_UPDATE',
         },
       })
 
-      // Create internal notification to notify source app if needed
+      // Create internal notification
       if (normalizedStatus === 'success' || normalizedStatus === 'failed') {
-        await tx.internalNotification.create({
+        await tx.internal_notifications.create({
           data: {
-            paymentIntentId: paymentIntent.id,
-            applicationId: paymentIntent.applicationId,
-            url: `${paymentIntent.application.baseUrl}${paymentIntent.application.webhookPath}`,
-            payload: JSON.stringify({
+            payment_intent_id: paymentIntent.id,
+            application_id: paymentIntent.application_id,
+            url: `${paymentIntent.applications.base_url}${paymentIntent.applications.webhook_path}`,
+            payload: {
               paymentIntentId: paymentIntent.id,
               reference: paymentIntent.reference,
               status: normalizedStatus,
@@ -107,18 +113,21 @@ export async function POST(
               currency: parsedWebhook.currency || paymentIntent.currency,
               providerPaymentId: parsedWebhook.providerPaymentId,
               failureReason: parsedWebhook.failureReason,
-            }),
+            },
             status: 'pending',
-            attemptCount: 0,
-            maxAttempts: 5,
-            nextRetryAt: new Date(),
+            attempt_count: 0,
+            max_attempts: 5,
+            next_retry_at: new Date(),
           },
         })
       }
     })
 
-    // 9. Update webhook log to mark as processed
-    await updateWebhookLog(webhookLog.id, { paymentId: paymentIntent.id, processed: true })
+    // 9. Update webhook log
+    await db.webhook_logs.update({
+      where: { id: webhookLog.id },
+      data: { payment_intent_id: paymentIntent.id, processed: true },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {
