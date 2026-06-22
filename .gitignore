@@ -30,10 +30,14 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Database files
+*.db
+*.db-journal
+# Environment files (keep secrets out of git!)
 .env
 .env.local
 .env.*.local
+# Keep .env.example as a template!
 !.env.example
 
 # vercel
