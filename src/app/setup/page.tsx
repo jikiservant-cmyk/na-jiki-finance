@@ -294,41 +294,37 @@ export default function SetupPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleCreateTenant} className="space-y-4">
-                  <div>
-                    <Label>Application</Label>
-                    <select name="applicationId" required className="w-full p-2 border rounded">
-                      {applications.map((app) => (
-                        <option key={app.id} value={app.id}>{app.name} ({app.code})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>Code</Label>
-                    <Input name="code" required placeholder="e.g. abc-sacco" />
-                  </div>
-                  <div>
-                    <Label>App Type</Label>
-                    <Input name="appType" required placeholder="e.g. sacco" />
-                  </div>
-                  <div>
-                    <Label>Name</Label>
-                    <Input name="name" required placeholder="e.g. ABC SACCO" />
-                  </div>
-                  <div>
-                    <Label>Default Provider</Label>
-                    <select name="defaultProviderId" className="w-full p-2 border rounded">
-                      <option value="">None</option>
-                      {providers.map((provider) => (
-                        <option key={provider.id} value={provider.id}>{provider.name} ({provider.code})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label>Active</Label>
-                    <Switch name="isActive" defaultChecked />
-                  </div>
-                  <Button type="submit">Create Tenant</Button>
-                </form>
+          <div>
+            <Label>Application</Label>
+            <select name="applicationId" required className="w-full p-2 border rounded">
+              {applications.map((app) => (
+                <option key={app.id} value={app.id}>{app.name} ({app.code})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label>Code</Label>
+            <Input name="code" required placeholder="e.g. abc-sacco" />
+          </div>
+          <div>
+            <Label>Name</Label>
+            <Input name="name" required placeholder="e.g. ABC SACCO" />
+          </div>
+          <div>
+            <Label>Default Provider</Label>
+            <select name="defaultProviderId" className="w-full p-2 border rounded">
+              <option value="">None</option>
+              {providers.map((provider) => (
+                <option key={provider.id} value={provider.id}>{provider.name} ({provider.code})</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Label>Active</Label>
+            <Switch name="isActive" defaultChecked />
+          </div>
+          <Button type="submit">Create Tenant</Button>
+        </form>
               </CardContent>
             </Card>
             <div className="space-y-4">

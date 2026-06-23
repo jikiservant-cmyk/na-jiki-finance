@@ -42,7 +42,6 @@ export async function POST(request: Request) {
           data: {
             applicationId: data.applicationId,
             code: data.code,
-            appType: data.appType,
             name: data.name,
             defaultProviderId: data.defaultProviderId || null,
             isActive: data.isActive,
