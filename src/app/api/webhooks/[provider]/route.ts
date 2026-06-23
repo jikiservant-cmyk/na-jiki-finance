@@ -3,12 +3,14 @@
 // FIX 2: Move webhookLog "mark processed" update INSIDE the db.$transaction()
 //         Previously it ran after the tx committed. If it failed, LivePay would
 //         retry → duplicate transaction log + duplicate notification.
+// FIX 3: Add wallet updates based on application type!
 
 import { NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { db } from '@/lib/db'
 import { getPaymentProvider, getAvailableProviders } from '@/lib/providers'
 import { createWebhookLog, getPaymentByReference } from '@/lib/data'
+import { PrismaClient } from '@prisma/client'
 
 export async function POST(
   request: Request,
@@ -87,11 +89,23 @@ export async function POST(
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
     }
 
+    // Fetch the full application to know which type we're dealing with
+    const fullPaymentIntent = await db.paymentIntent.findUnique({
+      where: { id: paymentIntent.id },
+      include: { application: true, tenant: true },
+    })
+
+    if (!fullPaymentIntent) {
+      await db.webhookLog.update({
+        where: { id: webhookLog.id },
+        data: { processingError: 'Payment not found', processed: true },
+      })
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+    }
+
     const normalizedStatus = parsedWebhook.status.toLowerCase()
 
-    // FIX 2: ALL writes — including the webhookLog update — are inside one transaction.
-    // If any step fails, everything rolls back. LivePay retries → idempotency hash
-    // catches it and returns 200 without reprocessing.
+    // FIX 2 & 3: ALL writes — including the webhookLog update AND wallet updates — are inside one transaction.
     await db.$transaction(async (tx) => {
       // Update payment intent
       await tx.paymentIntent.update({
@@ -120,13 +134,42 @@ export async function POST(
         },
       })
 
+      // If payment was successful, update wallet based on application type!
+      if (normalizedStatus === 'success' && fullPaymentIntent.tenant) {
+        // Route wallet update based on application code!
+        const appCode = fullPaymentIntent.application.code.toLowerCase()
+        const amount = Number(parsedWebhook.amount || paymentIntent.amount)
+        const tenantId = fullPaymentIntent.tenant.id
+
+        if (appCode === 'church') {
+          // For churches, tenant.id maps to church.churches.id,
+          // update church.wallets in "church" schema!
+          // First ensure the wallet exists (upsert)!
+          await tx.$executeRaw`
+            INSERT INTO "church"."wallets" ("church_id", "balance", "sms_credits", "created_at", "updated_at")
+            VALUES (${tenantId}, ${amount}, 0, NOW(), NOW())
+            ON CONFLICT ("church_id") DO UPDATE 
+            SET "balance" = "church"."wallets"."balance" + ${amount}, "updated_at" = NOW()
+          `
+        } else if (appCode === 'sacco') {
+          // For SACCOs, tenant.id maps to kuntiy.saccos.id,
+          // update kuntiy.wallets in "kuntiy" schema!
+          await tx.$executeRaw`
+            INSERT INTO "kuntiy"."wallets" ("sacco_id", "balance", "created_at", "updated_at")
+            VALUES (${tenantId}, ${amount}, NOW(), NOW())
+            ON CONFLICT ("sacco_id") DO UPDATE 
+            SET "balance" = "kuntiy"."wallets"."balance" + ${amount}, "updated_at" = NOW()
+          `
+        }
+      }
+
       // Queue internal notification for terminal statuses
       if (normalizedStatus === 'success' || normalizedStatus === 'failed') {
         await tx.internalNotification.create({
           data: {
             paymentIntentId: paymentIntent.id,
-            applicationId: paymentIntent.applicationId,
-            url: `${paymentIntent.application.baseUrl}${paymentIntent.application.webhookPath}`,
+            applicationId: fullPaymentIntent.applicationId,
+            url: `${fullPaymentIntent.application.baseUrl}${fullPaymentIntent.application.webhookPath}`,
             payload: JSON.stringify({
               paymentIntentId: paymentIntent.id,
               reference: paymentIntent.reference,
@@ -145,8 +188,6 @@ export async function POST(
       }
 
       // FIX 2: mark log processed INSIDE the transaction
-      // Previously this ran after tx.commit() — a failure here left the log
-      // as "unprocessed" and caused LivePay to retry → duplicate writes
       await tx.webhookLog.update({
         where: { id: webhookLog.id },
         data: { paymentIntentId: paymentIntent.id, processed: true },
