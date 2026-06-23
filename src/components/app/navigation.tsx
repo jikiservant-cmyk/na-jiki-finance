@@ -2,18 +2,30 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { LogOut } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 const navItems = [
   { href: '/', label: 'Dashboard' },
   { href: '/transactions', label: 'Transactions' },
   { href: '/webhooks', label: 'Webhooks' },
+  { href: '/setup', label: 'Setup' },
 ]
 
 export function Navigation() {
   const pathname = usePathname()
+  const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
+  const supabase = createClientComponentClient()
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.refresh()
+    router.push('/login')
+  }
 
   return (
     <>
@@ -75,16 +87,25 @@ export function Navigation() {
           <div className="hidden md:flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-emerald-400 pulse-live" />
             <span className="text-[10px] font-mono text-muted-foreground">Live</span>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="flex items-center gap-2">
+              <LogOut className="w-4 h-4" />
+              <span className="text-[10px] font-mono tracking-[0.15em] uppercase">Logout</span>
+            </Button>
           </div>
 
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="md:hidden flex flex-col gap-1.5 w-6"
-          >
-            <motion.span animate={menuOpen ? { rotate: 45, y: 5 } : { rotate: 0, y: 0 }} className="h-px bg-foreground/70 w-full origin-center" />
-            <motion.span animate={menuOpen ? { opacity: 0 } : { opacity: 1 }} className="h-px bg-foreground/70 w-full" />
-            <motion.span animate={menuOpen ? { rotate: -45, y: -5 } : { rotate: 0, y: 0 }} className="h-px bg-foreground/70 w-full origin-center" />
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="w-4 h-4" />
+            </Button>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="flex flex-col gap-1.5 w-6"
+            >
+              <motion.span animate={menuOpen ? { rotate: 45, y: 5 } : { rotate: 0, y: 0 }} className="h-px bg-foreground/70 w-full origin-center" />
+              <motion.span animate={menuOpen ? { opacity: 0 } : { opacity: 1 }} className="h-px bg-foreground/70 w-full" />
+              <motion.span animate={menuOpen ? { rotate: -45, y: -5 } : { rotate: 0, y: 0 }} className="h-px bg-foreground/70 w-full origin-center" />
+            </button>
+          </div>
         </div>
       </motion.nav>
 
