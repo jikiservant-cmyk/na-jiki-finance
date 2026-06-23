@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import crypto from 'crypto'
+
+function generateApiKey(): string {
+  return `nk_${crypto.randomBytes(24).toString('hex')}`
+}
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +20,7 @@ export async function POST(request: Request) {
             baseUrl: data.baseUrl,
             webhookPath: data.webhookPath,
             internalSecretRef: data.internalSecretRef,
+            apiKey: generateApiKey(),
             isActive: data.isActive,
           },
         })

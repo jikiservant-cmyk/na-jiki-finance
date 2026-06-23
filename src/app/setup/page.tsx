@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Copy } from 'lucide-react'
 
 interface Application {
   id: string
@@ -16,9 +18,12 @@ interface Application {
   baseUrl: string
   webhookPath: string
   internalSecretRef: string
+  apiKey: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
+  tenants: any[]
+  paymentTypes: any[]
 }
 
 interface Tenant {
@@ -55,6 +60,7 @@ export default function SetupPage() {
   const [applications, setApplications] = useState<Application[]>([])
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
+  const [newApiKey, setNewApiKey] = useState<string | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -84,7 +90,12 @@ export default function SetupPage() {
       internalSecretRef: formData.get('internalSecretRef') as string,
       isActive: (formData.get('isActive') as string) === 'on',
     }
-    await fetch('/api/setup', { method: 'POST', body: JSON.stringify({ type: 'application', data }) })
+    const res = await fetch('/api/setup', { 
+      method: 'POST', 
+      body: JSON.stringify({ type: 'application', data }) 
+    })
+    const newApp = await res.json()
+    setNewApiKey(newApp.apiKey)
     e.currentTarget.reset()
     fetchData()
   }
@@ -132,11 +143,30 @@ export default function SetupPage() {
     fetchData()
   }
 
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text)
+  }
+
   if (loading) return <div className="container mx-auto py-8">Loading...</div>
 
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-8">NaJiki Setup</h1>
+      
+      {newApiKey && (
+        <Alert className="mb-8 border-green-500 bg-green-50">
+          <AlertDescription className="flex items-center gap-4">
+            <div className="flex-1">
+              <p className="font-bold text-green-800">Application API Key</p>
+              <p className="text-green-700 font-mono break-all">{newApiKey}</p>
+            </div>
+            <Button onClick={() => copyToClipboard(newApiKey)} variant="default" size="sm">
+              <Copy className="w-4 h-4 mr-2" /> Copy
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs defaultValue="applications">
         <TabsList className="mb-8">
           <TabsTrigger value="applications">Applications</TabsTrigger>
@@ -192,6 +222,19 @@ export default function SetupPage() {
                     <p className="text-xs text-muted-foreground mt-2">
                       Tenants: {app.tenants?.length || 0} • Payment Types: {app.paymentTypes?.length || 0}
                     </p>
+                    {app.apiKey && (
+                      <div className="mt-3">
+                        <Label className="text-xs">API Key:</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs font-mono bg-muted p-2 rounded flex-1 overflow-x-auto">
+                            {app.apiKey}
+                          </p>
+                          <Button onClick={() => copyToClipboard(app.apiKey)} variant="default" size="sm">
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

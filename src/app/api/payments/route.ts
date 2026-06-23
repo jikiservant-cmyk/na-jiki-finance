@@ -50,6 +50,12 @@ export async function POST(request: Request) {
   }
 
   try {
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 })
+    }
+    const apiKey = authHeader.slice(7) // Remove 'Bearer ' prefix
+
     const rawBody = await request.json()
     const validatedBody = CreatePaymentRequestSchema.parse(rawBody)
 
@@ -68,13 +74,17 @@ export async function POST(request: Request) {
     // Parallelise independent lookups
     const [application, activeProvider] = await Promise.all([
       db.application.findFirst({
-        where: { code: validatedBody.applicationCode, isActive: true },
+        where: { 
+          code: validatedBody.applicationCode, 
+          apiKey: apiKey,
+          isActive: true 
+        },
       }),
       db.provider.findFirst({ where: { isActive: true } }),
     ])
 
     if (!application) {
-      return NextResponse.json({ error: 'Invalid or inactive application' }, { status: 404 })
+      return NextResponse.json({ error: 'Invalid or inactive application, or invalid API key' }, { status: 401 })
     }
 
     // Tenant + payment type (conditional on request body)

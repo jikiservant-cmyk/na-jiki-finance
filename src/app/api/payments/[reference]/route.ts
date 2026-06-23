@@ -6,10 +6,22 @@ export async function GET(
   { params }: { params: Promise<{ reference: string }> }
 ) {
   try {
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 })
+    }
+    const apiKey = authHeader.slice(7) // Remove 'Bearer ' prefix
+
+    const application = await db.application.findFirst({
+      where: { apiKey, isActive: true }
+    })
+
+    if (!application) {
+      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 })
+    }
+
     const { reference } = await params
 
-    // FIX 1: `appType` doesn't exist on Tenant — field is `code`
-    // FIX 2: findUnique (not findFirst) — reference is @unique, hits index directly
     const paymentIntent = await db.paymentIntent.findUnique({
       where: { reference },
       include: {
@@ -21,6 +33,11 @@ export async function GET(
     })
 
     if (!paymentIntent) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+    }
+
+    // Check that the payment intent belongs to the authenticated application
+    if (paymentIntent.applicationId !== application.id) {
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
     }
 
