@@ -165,30 +165,39 @@ model WebhookLog {
 }
 
 model InternalNotification {
-  id              String        @id @default(cuid())
-  paymentIntentId String        @map("payment_intent_id")
-  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id])
-  applicationId   String        @map("application_id")
-  application     Application   @relation(fields: [applicationId], references: [id])
+  id               String   @id @default(cuid())
+  paymentIntentId  String   @map("payment_intent_id")
+  paymentIntent    PaymentIntent @relation(fields: [paymentIntentId], references: [id])
+  applicationId    String   @map("application_id")
+  application      Application @relation(fields: [applicationId], references: [id])
 
-  url     String
-  payload String
+  url              String
+  payload          String
 
-  status       String @default("pending")
-  attemptCount Int    @map("attempt_count") @default(0)
-  maxAttempts  Int    @map("max_attempts") @default(5)
+  status           String   @default("pending")
+  attemptCount     Int      @map("attempt_count") @default(0)
+  maxAttempts      Int      @map("max_attempts") @default(5)
 
-  lastAttemptAt      DateTime? @map("last_attempt_at")
-  nextRetryAt        DateTime? @map("next_retry_at")
-  lastResponseStatus Int?      @map("last_response_status")
-  lastResponseBody   String?   @map("last_response_body")
+  lastAttemptAt    DateTime? @map("last_attempt_at")
+  nextRetryAt      DateTime? @map("next_retry_at")
+  lastResponseStatus Int?  @map("last_response_status")
+  lastResponseBody  String?  @map("last_response_body")
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt        DateTime @map("created_at") @default(now())
+  updatedAt        DateTime @map("updated_at") @updatedAt
 
   @@index([paymentIntentId])
-  // FIX: cron worker uses this index — status IN (...) AND nextRetryAt <= now()
   @@index([status, nextRetryAt])
   @@map("internal_notifications")
+  @@schema("public")
+}
+
+model AdminProfile {
+  id               String   @id
+  role             String   @default("super_admin")
+  createdAt        DateTime @map("created_at") @default(now())
+  updatedAt        DateTime @map("updated_at") @updatedAt
+
+  @@map("admin_profiles")
   @@schema("public")
 }
