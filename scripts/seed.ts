@@ -6,6 +6,11 @@
 // All status values below are already plain string literals — no change needed there.
 
 import { db } from '../src/lib/db'
+import crypto from 'crypto'
+
+function generateApiKey(): string {
+  return `nk_${crypto.randomBytes(24).toString('hex')}`
+}
 
 async function seed() {
   // === PROVIDERS ===
@@ -23,15 +28,25 @@ async function seed() {
   })
 
   // === APPLICATIONS ===
+  const saccoApiKey = generateApiKey()
   const sacco = await db.application.create({
-    data: { code: 'sacco', name: 'SACCO Platform', baseUrl: 'https://sacco.yourdomain.com', webhookPath: '/api/internal/payment-completed', internalSecretRef: 'SACCO_INTERNAL_SECRET', isActive: true },
+    data: { code: 'sacco', name: 'SACCO Platform', baseUrl: 'https://sacco.yourdomain.com', webhookPath: '/api/internal/payment-completed', internalSecretRef: 'SACCO_INTERNAL_SECRET', apiKey: saccoApiKey, isActive: true },
   })
+  
+  const churchApiKey = generateApiKey()
   const church = await db.application.create({
-    data: { code: 'church', name: 'Church App', baseUrl: 'https://church.yourdomain.com', webhookPath: '/api/internal/payment-completed', internalSecretRef: 'CHURCH_INTERNAL_SECRET', isActive: true },
+    data: { code: 'church', name: 'Church App', baseUrl: 'https://church.yourdomain.com', webhookPath: '/api/internal/payment-completed', internalSecretRef: 'CHURCH_INTERNAL_SECRET', apiKey: churchApiKey, isActive: true },
   })
+  
+  const schoolApiKey = generateApiKey()
   const school = await db.application.create({
-    data: { code: 'school', name: 'School Platform', baseUrl: 'https://school.yourdomain.com', webhookPath: '/api/internal/payment-completed', internalSecretRef: 'SCHOOL_INTERNAL_SECRET', isActive: true },
+    data: { code: 'school', name: 'School Platform', baseUrl: 'https://school.yourdomain.com', webhookPath: '/api/internal/payment-completed', internalSecretRef: 'SCHOOL_INTERNAL_SECRET', apiKey: schoolApiKey, isActive: true },
   })
+  
+  console.log('Generated API keys:')
+  console.log('- SACCO:', saccoApiKey)
+  console.log('- Church:', churchApiKey)
+  console.log('- School:', schoolApiKey)
 
   // === TENANTS ===
   const abcSacco = await db.tenant.create({
