@@ -6,6 +6,7 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  schemas   = ["public", "auth"]
 }
 
 model Application {
@@ -26,6 +27,7 @@ model Application {
   internalNotifications InternalNotification[]
 
   @@map("applications")
+  @@schema("public")
 }
 
 model Provider {
@@ -42,6 +44,7 @@ model Provider {
   webhookLogs    WebhookLog[]
 
   @@map("providers")
+  @@schema("public")
 }
 
 model Tenant {
@@ -60,6 +63,7 @@ model Tenant {
 
   @@unique([applicationId, code])
   @@map("tenants")
+  @@schema("public")
 }
 
 model PaymentType {
@@ -74,6 +78,7 @@ model PaymentType {
 
   @@unique([applicationId, code])
   @@map("payment_types")
+  @@schema("public")
 }
 
 model PaymentIntent {
@@ -114,9 +119,10 @@ model PaymentIntent {
   @@index([status])
   @@index([createdAt])
   @@index([providerPaymentId])
-  // FIX: composite index speeds up dashboard per-app, per-status queries
+  // FIX: composite index speeds up dashboard per-app, per-status queries 
   @@index([applicationId, status, createdAt])
   @@map("payment_intents")
+  @@schema("public")
 }
 
 model PaymentTransaction {
@@ -126,11 +132,12 @@ model PaymentTransaction {
   status              String
   rawProviderResponse String?       @map("raw_provider_response")
   note                String?
-  createdAt           DateTime      @map("created_at") @default(now())
+  createdAt           DateTime      @map("created_at") @default(now())    
 
   @@index([paymentIntentId])
   @@index([createdAt])
   @@map("payment_transactions")
+  @@schema("public")
 }
 
 model WebhookLog {
@@ -154,6 +161,7 @@ model WebhookLog {
   @@index([paymentIntentId])
   @@index([createdAt])
   @@map("webhook_logs")
+  @@schema("public")
 }
 
 model InternalNotification {
@@ -182,4 +190,5 @@ model InternalNotification {
   // FIX: cron worker uses this index — status IN (...) AND nextRetryAt <= now()
   @@index([status, nextRetryAt])
   @@map("internal_notifications")
+  @@schema("public")
 }
