@@ -17,13 +17,19 @@ export async function GET() {
 
     return NextResponse.json({
       applications: apps.map(app => ({
+        id: app.id,
         code: app.code,
         name: app.name,
         baseUrl: app.baseUrl,
-        tenants: app.tenants.map(t => ({ code: t.code, name: t.name })),
-        paymentTypes: app.paymentTypes.map(pt => ({ code: pt.code, description: pt.description })),
+        webhookPath: app.webhookPath,
+        internalSecretRef: app.internalSecretRef,
+        isActive: app.isActive,
+        createdAt: app.createdAt,
+        updatedAt: app.updatedAt,
+        tenants: app.tenants,
+        paymentTypes: app.paymentTypes,
       })),
-      providers: providers.map(p => ({ code: p.code, name: p.name })),
+      providers: providers,
     })
   } catch (error) {
     console.error('Debug apps error:', error)
